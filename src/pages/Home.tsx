@@ -10,10 +10,8 @@ import {
   Github,
   CheckCircle2
 } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
 
 export const Home = ({ onLogin }: { onLogin: () => void }) => {
-  const navigate = useNavigate();
 
   const features = [
     { 

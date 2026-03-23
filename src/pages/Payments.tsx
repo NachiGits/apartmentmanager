@@ -122,7 +122,7 @@ export const Payments = () => {
                  <tr><td colSpan={6} className="p-20 text-center"><Loader2 className="animate-spin mx-auto text-indigo-600" /></td></tr>
                ) : payments.length === 0 ? (
                  <tr><td colSpan={6} className="p-20 text-center text-slate-400 font-medium">No pending payments for this cycle.</td></tr>
-               ) : payments.map((p, i) => (
+               ) : payments.map((p, _i) => (
                  <tr key={p.id} className="group hover:bg-slate-50/50 dark:hover:bg-slate-800/50 transition-colors">
                    <td className="px-8 py-5">
                       <div className="flex items-center gap-3">
