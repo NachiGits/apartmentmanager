@@ -27,41 +27,44 @@ export const Login = () => {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-900 via-slate-800 to-indigo-950 px-4 relative">
+    <div className="min-h-screen flex items-center justify-center bg-[#020617] px-4 relative overflow-hidden">
+      {/* Dynamic Background Elements */}
+      <div className="absolute inset-0 pointer-events-none">
+        <div className="absolute -top-24 -left-24 w-[500px] h-[500px] bg-emerald-500/10 rounded-full blur-[120px] animate-pulse"></div>
+        <div className="absolute top-1/2 -right-24 w-[500px] h-[500px] bg-teal-600/10 rounded-full blur-[120px] animate-pulse delay-700"></div>
+        <div className="absolute bottom-0 left-1/4 w-[300px] h-[300px] bg-primary/5 rounded-full blur-[100px]"></div>
+      </div>
+
       {/* Back to Home Button */}
       <button 
         onClick={() => navigate('/')} 
-        className="absolute top-10 left-10 p-3 bg-white/5 hover:bg-white/10 text-white rounded-full transition-all flex items-center gap-2 font-bold text-xs uppercase tracking-widest pl-4 pr-6"
+        className="absolute top-10 left-10 p-3 bg-white/5 hover:bg-white/10 text-white border border-white/10 rounded-full transition-all flex items-center gap-2 font-bold text-[10px] uppercase tracking-widest pl-4 pr-6 z-50 backdrop-blur-md active:scale-95"
       >
         <ArrowLeft size={16} /> Back to Home
       </button>
 
-      <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute -top-24 -left-24 w-96 h-96 bg-indigo-600/20 rounded-full blur-3xl animate-pulse"></div>
-        <div className="absolute top-1/2 -right-24 w-96 h-96 bg-violet-600/20 rounded-full blur-3xl animate-pulse delay-700"></div>
-      </div>
-
       <motion.div 
-        initial={{ opacity: 0, scale: 0.9 }}
-        animate={{ opacity: 1, scale: 1 }}
-        className="w-full max-w-md"
+        initial={{ opacity: 0, scale: 0.95, y: 20 }}
+        animate={{ opacity: 1, scale: 1, y: 0 }}
+        transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
+        className="w-full max-w-md relative z-10"
       >
         <div className="text-center mb-10">
-          <div className="inline-flex items-center justify-center p-4 bg-indigo-600 rounded-[2rem] shadow-2xl shadow-indigo-600/30 mb-6 group transition-transform hover:scale-110">
-            <Building2 size={40} className="text-white" />
+          <div className="inline-flex items-center justify-center p-5 bg-gradient-premium rounded-[2.5rem] shadow-2xl shadow-emerald-500/20 mb-8 group transition-transform hover:scale-110">
+            <Building2 size={44} className="text-white" strokeWidth={2.5} />
           </div>
-          <h2 className="text-4xl font-black text-white tracking-tighter">Sign In</h2>
-          <p className="text-slate-400 mt-2 font-medium">Access your community dashboard</p>
+          <h2 className="text-5xl font-black text-white tracking-tighter mb-3">Sign In</h2>
+          <p className="text-surface-400 font-medium tracking-tight">Access your premium community dashboard</p>
         </div>
 
-        <div className="glass bg-white/5 backdrop-blur-3xl border-white/10 p-10 rounded-[2.5rem] shadow-2xl text-center">
-          <div className="bg-indigo-500/10 border border-indigo-500/20 rounded-2xl p-6 mb-10 flex items-center gap-4 text-left">
-             <div className="p-3 bg-indigo-600 text-white rounded-xl shadow-lg shadow-indigo-600/20">
-               <Mail size={24} />
+        <div className="glass bg-white/[0.03] backdrop-blur-3xl border border-white/10 p-10 rounded-[3rem] shadow-2xl text-center">
+          <div className="bg-emerald-500/5 border border-emerald-500/10 rounded-2xl p-6 mb-10 flex items-center gap-4 text-left">
+             <div className="p-3 bg-white/5 text-primary rounded-xl border border-white/10 shadow-lg">
+               <Mail size={24} strokeWidth={2.5} />
              </div>
              <div>
-               <p className="text-xs font-black text-indigo-300 uppercase tracking-widest">Modern Login</p>
-               <p className="text-sm font-medium text-slate-300">Fast, secure One-Tap access with Google.</p>
+               <p className="text-[10px] font-black text-primary uppercase tracking-[0.2em]">One-Tap Access</p>
+               <p className="text-sm font-medium text-surface-400 leading-tight mt-1">Fast, secure authentication with Google.</p>
              </div>
           </div>
 
@@ -69,7 +72,7 @@ export const Login = () => {
             <button 
               onClick={handleGoogleLogin} 
               disabled={loading}
-              className="group w-full bg-white text-slate-900 py-4.5 rounded-2xl font-black text-lg flex items-center justify-center gap-4 shadow-2xl hover:bg-slate-50 transition-all active:scale-95 disabled:opacity-70"
+              className="group w-full bg-white text-surface-950 py-5 rounded-2xl font-black text-lg flex items-center justify-center gap-4 shadow-2xl hover:bg-surface-50 transition-all active:scale-[0.98] disabled:opacity-70 disabled:cursor-not-allowed"
             >
               {loading ? <Loader2 className="animate-spin" size={24} /> : (
                 <>
@@ -85,14 +88,18 @@ export const Login = () => {
             </button>
             
             {error && (
-              <div className="mt-6 bg-red-500/10 border border-red-500/20 text-red-300 px-6 py-4 rounded-2xl text-sm font-semibold flex items-center justify-center gap-2">
-                <span className="w-1.5 h-1.5 bg-red-500 rounded-full"></span> {error}
-              </div>
+              <motion.div 
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="mt-6 bg-red-500/10 border border-red-500/20 text-red-300 px-6 py-4 rounded-2xl text-sm font-semibold flex items-center justify-center gap-3"
+              >
+                <div className="w-2 h-2 bg-red-500 rounded-full animate-pulse shadow-[0_0_10px_rgba(239,68,68,0.5)]"></div> {error}
+              </motion.div>
             )}
           </div>
 
-          <p className="mt-12 text-slate-500 text-xs font-medium px-6">
-            By signing in, you agree to our <span className="text-indigo-400">Terms of Service</span> and <span className="text-indigo-400">Privacy Policy</span>.
+          <p className="mt-12 text-surface-500 text-[10px] font-bold uppercase tracking-[0.2em] px-6">
+            Secured by Supabase & OAuth 2.0
           </p>
         </div>
       </motion.div>
