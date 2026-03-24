@@ -60,7 +60,7 @@ export const CompleteProfile = () => {
       .from('profiles')
       .select('apartment_id, role')
       .eq('id', user.id)
-      .single();
+      .maybeSingle();
 
     if (profile?.apartment_id) {
       navigate('/', { replace: true });
@@ -111,6 +111,12 @@ export const CompleteProfile = () => {
       if (invErr || !invite) throw new Error('Invalid or expired invite code.');
       if (new Date(invite.expires_at) < new Date()) throw new Error('This invite code has expired.');
 
+      // Fetch existing role to avoid downgrading
+      const { data: existingProfile } = await supabase.from('profiles').select('role').eq('id', user.id).single();
+      const userRole = (existingProfile?.role && ['SUPER_ADMIN', 'ADMIN', 'RESIDENT'].includes(existingProfile.role)) 
+        ? existingProfile.role 
+        : 'RESIDENT';
+
       // Update profile
       const { error: profErr } = await supabase.from('profiles').upsert({
         id:           user.id,
@@ -119,10 +125,18 @@ export const CompleteProfile = () => {
         avatar_url:   user.user_metadata?.avatar_url,
         apartment_id: invite.apartment_id,
         unit_number:  invite.unit_number || null,
-        role:         'MEMBER',
+        role:         userRole,
         updated_at:   new Date().toISOString(),
       });
       if (profErr) throw new Error(profErr.message);
+
+      // Add to apartment_members
+      const { error: memErr } = await supabase.from('apartment_members').upsert({
+        profile_id:   user.id,
+        apartment_id: invite.apartment_id,
+        role:         'MEMBER'
+      });
+      if (memErr) throw new Error(memErr.message);
 
       // Mark invite accepted
       await supabase.from('invitations').update({ status: 'ACCEPTED' }).eq('token', inviteCode.trim());
@@ -146,13 +160,17 @@ export const CompleteProfile = () => {
       // Insert apartment
       const { data: apt, error: aptErr } = await supabase
         .from('apartments')
-        .insert({ name: aptName.trim(), address: aptAddress.trim() || null })
+        .insert({ 
+          name: aptName.trim(), 
+          address: aptAddress.trim() || null,
+          created_by: user.id
+        })
         .select()
         .single();
 
       if (aptErr || !apt) throw new Error(aptErr?.message || 'Failed to create apartment.');
 
-      // Update profile as ADMIN
+      // Update profile as ADMIN (current primary apartment)
       const { error: profErr } = await supabase.from('profiles').upsert({
         id:           user.id,
         email:        user.email,
@@ -163,6 +181,14 @@ export const CompleteProfile = () => {
         updated_at:   new Date().toISOString(),
       });
       if (profErr) throw new Error(profErr.message);
+
+      // Add to apartment_members as ADMIN
+      const { error: memErr } = await supabase.from('apartment_members').upsert({
+        profile_id:   user.id,
+        apartment_id: apt.id,
+        role:         'ADMIN'
+      });
+      if (memErr) throw new Error(memErr.message);
 
       setMode('done');
       setTimeout(() => navigate('/', { replace: true }), 1800);

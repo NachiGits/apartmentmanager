@@ -28,6 +28,11 @@ export const Residents = () => {
   const [search, setSearch]                 = useState('');
   const [showInviteModal, setShowInviteModal] = useState(false);
 
+  // User state
+  const [userRole, setUserRole]               = useState<string | null>(null);
+  const [userAptId, setUserAptId]             = useState<string | null>(null);
+  const [userFullName, setUserFullName]       = useState<string>('');
+
   // Invite form state
   const [inviteEmail, setInviteEmail]       = useState('');
   const [inviteUnit, setInviteUnit]         = useState('');
@@ -40,8 +45,26 @@ export const Residents = () => {
   const [copied, setCopied]                 = useState(false);
 
   useEffect(() => {
+    fetchProfile();
     fetchResidents();
   }, []);
+
+  const fetchProfile = async () => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
+
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('apartment_id, role, full_name')
+      .eq('id', user.id)
+      .single();
+    
+    if (profile) {
+      setUserRole(profile.role);
+      setUserAptId(profile.apartment_id);
+      setUserFullName(profile.full_name || '');
+    }
+  };
 
   const fetchResidents = async () => {
     setLoading(true);
@@ -63,46 +86,95 @@ export const Residents = () => {
     );
   });
 
+  const handlePromote = async (residentId: string) => {
+    const isRelinquishing = userRole !== 'SUPER_ADMIN';
+    const confirmMsg = isRelinquishing
+      ? 'Are you sure? You will promote this member to Admin and you will become a normal Member. You will lose administrative access to this apartment.'
+      : 'Promote this member to Admin? (As Super Admin, you will retain your global access).';
+
+    if (!window.confirm(confirmMsg)) return;
+    
+    try {
+      const { data: { user: currentUser } } = await supabase.auth.getUser();
+      if (!currentUser) return;
+
+      // 1. Promote the target member in apartment_members
+      const { error: memErr } = await supabase
+        .from('apartment_members')
+        .update({ role: 'ADMIN' })
+        .eq('profile_id', residentId)
+        .eq('apartment_id', userAptId);
+      if (memErr) throw memErr;
+
+      // 2. Promote target member in global profiles
+      const { error: profErr } = await supabase
+        .from('profiles')
+        .update({ role: 'ADMIN' })
+        .eq('id', residentId);
+      if (profErr) throw profErr;
+
+      // 3. Transfer apartment ownership (created_by)
+      const { error: aptErr } = await supabase
+        .from('apartments')
+        .update({ created_by: residentId })
+        .eq('id', userAptId);
+      if (aptErr) throw aptErr;
+
+      // 4. Demote the current admin if they are not a Super Admin
+      if (isRelinquishing) {
+        // Demote in junction
+        await supabase
+          .from('apartment_members')
+          .update({ role: 'MEMBER' })
+          .eq('profile_id', currentUser.id)
+          .eq('apartment_id', userAptId);
+        
+        // Demote in profile (global role)
+        await supabase
+          .from('profiles')
+          .update({ role: 'MEMBER' })
+          .eq('id', currentUser.id);
+        
+        // Immediate UI feedback
+        setUserRole('MEMBER');
+      }
+
+      fetchResidents();
+    } catch (err: any) {
+      alert('Handover failed: ' + err.message);
+    }
+  };
+
   const handleInvite = async (e: React.FormEvent) => {
     e.preventDefault();
     setInviting(true);
     setInviteResult({ type: null, message: '' });
 
     try {
-      // 1. Get current user's apartment_id
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error('Not authenticated.');
-
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('apartment_id, full_name, apartments(name)')
-        .eq('id', user.id)
-        .single();
-
-      if (!profile?.apartment_id) throw new Error('Your profile is not linked to an apartment.');
+      if (!userAptId) throw new Error('Your profile is not linked to an apartment.');
 
       // 2. Create invitation in database
       const { data: invitation, error: insertError } = await supabase
         .from('invitations')
         .insert({
           email:        inviteEmail || null,
-          apartment_id: profile.apartment_id,
+          apartment_id: userAptId,
           unit_number:  inviteUnit || null,
-          invited_by:   user.id,
+          invited_by:   (await supabase.auth.getUser()).data.user?.id,
         })
         .select()
         .single();
 
       if (insertError || !invitation) throw new Error('Failed to create invitation.');
 
-      const inviteLink = `${window.location.origin}/join?token=${invitation.token}`;
+      const inviteLink = `${window.location.origin}/join/${invitation.token}`;
 
       // 3. Send email via Brevo (if email provided)
       if (inviteEmail) {
         const emailResult = await sendInviteEmail({
           toEmail:       inviteEmail,
-          apartmentName: (profile.apartments as any)?.name || 'Your Apartment',
-          inviterName:   profile.full_name || 'Your Admin',
+          apartmentName: 'Your Apartment', // Simplification for now or we could fetch it
+          inviterName:   userFullName || 'Your Admin',
           unitNumber:    inviteUnit || undefined,
           inviteToken:   invitation.token,
         });
@@ -162,14 +234,16 @@ export const Residents = () => {
           <p className="text-slate-500 mt-1">Manage unit assignments and member access.</p>
         </div>
 
-        <div className="flex gap-3">
-          <button
-            onClick={() => setShowInviteModal(true)}
-            className="flex items-center gap-2 px-6 py-2.5 bg-indigo-600 text-white rounded-xl text-sm font-bold hover:bg-indigo-500 shadow-lg shadow-indigo-600/20 transition-all active:scale-95"
-          >
-            <UserPlus size={18} /> Invite Member
-          </button>
-        </div>
+        {(userRole === 'ADMIN' || userRole === 'SUPER_ADMIN') && (
+          <div className="flex gap-3">
+            <button
+              onClick={() => setShowInviteModal(true)}
+              className="flex items-center gap-2 px-6 py-2.5 bg-indigo-600 text-white rounded-xl text-sm font-bold hover:bg-indigo-500 shadow-lg shadow-indigo-600/20 transition-all active:scale-95"
+            >
+              <UserPlus size={18} /> Invite Member
+            </button>
+          </div>
+        )}
       </div>
 
       <div className="glass p-6 bg-white/40 dark:bg-slate-900/40">
@@ -237,9 +311,19 @@ export const Residents = () => {
                 <div className="flex -space-x-2">
                   {[1, 2].map(i => <div key={i} className="w-8 h-8 rounded-full border-2 border-white dark:border-slate-800 bg-slate-200" />)}
                 </div>
-                <button className="text-xs font-bold text-indigo-600 flex items-center gap-1 hover:underline underline-offset-4">
-                  View Profile <Maximize2 size={12} />
-                </button>
+                <div className="flex flex-col gap-2">
+                  <button className="text-xs font-bold text-indigo-600 flex items-center gap-1 hover:underline underline-offset-4">
+                    View Profile <Maximize2 size={12} />
+                  </button>
+                  {((userRole === 'ADMIN' || userRole === 'SUPER_ADMIN') && r.role === 'MEMBER') && (
+                    <button 
+                      onClick={() => handlePromote(r.id)}
+                      className="text-[10px] font-black text-amber-600 uppercase tracking-wider flex items-center gap-1 hover:text-amber-500"
+                    >
+                      <ShieldCheck size={12} /> Promote to Admin
+                    </button>
+                  )}
+                </div>
               </div>
             </motion.div>
           ))}

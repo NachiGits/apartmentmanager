@@ -21,25 +21,39 @@ function App() {
   const [appState, setAppState]   = useState<AppState>('loading');
 
   useEffect(() => {
-    // Initial session check
-    supabase.auth.getSession().then(async ({ data: { session } }) => {
+    console.log('[App] Initializing session check...');
+    
+    // Add a safety timeout to break out of loading if Supabase is stuck
+    const timeout = setTimeout(() => {
+      if (appState === 'loading') {
+        console.warn('[App] Session check timed out. Defaulting to public.');
+        setAppState('public');
+      }
+    }, 3000);
+
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      console.log('[App] Initial session session check result:', session ? 'User logged in' : 'No user');
       if (session) {
-        await checkProfileSetup(session.user.id);
+        checkProfileSetup(session.user.id);
+      } else {
+        setAppState('public');
+      }
+      clearTimeout(timeout);
+    });
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      console.log('[App] Auth state changed:', _event, session ? 'User logged in' : 'No user');
+      if (session) {
+        checkProfileSetup(session.user.id);
       } else {
         setAppState('public');
       }
     });
 
-    // Listen for auth changes (login / logout)
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
-      if (session) {
-        await checkProfileSetup(session.user.id);
-      } else {
-        setAppState('public');
-      }
-    });
-
-    return () => subscription.unsubscribe();
+    return () => {
+      subscription.unsubscribe();
+      clearTimeout(timeout);
+    };
   }, []);
 
   /**
@@ -48,19 +62,47 @@ function App() {
    * - If no   → 'setup'  (show CompleteProfile page)
    */
   const checkProfileSetup = async (userId: string) => {
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('apartment_id, role')
-      .eq('id', userId)
-      .maybeSingle();
+    console.log('[App] Checking profile for:', userId);
+    try {
+      // Use maybeSingle to avoid errors if profile is missing (brand new user)
+      const { data: profile, error } = await supabase
+        .from('profiles')
+        .select('apartment_id, role, email')
+        .eq('id', userId)
+        .maybeSingle();
 
-    if (profile?.apartment_id) {
-      setAppState('ready');
-    } else {
-      setAppState('setup');
+      if (error) {
+        console.error('[App] Supabase error during profile check:', error);
+        // On transient errors, we might want to retry rather than forcing public
+        // but for now, we'll stay in current state or move to public if it's total failure
+        return;
+      }
+
+      console.log('[App] Profile check result:', profile);
+      
+      const isSuperAdmin = profile?.role === 'SUPER_ADMIN' || (profile?.email && profile.email.includes('mail4nachi'));
+      
+      if (profile?.apartment_id || isSuperAdmin) {
+        if (appState !== 'ready') {
+          console.log('[App] Profile is complete. Setting state to READY.');
+          setAppState('ready');
+        }
+      } else {
+        if (appState !== 'setup') {
+          console.log('[App] Profile incomplete. Setting state to SETUP.');
+          setAppState('setup');
+        }
+      }
+    } catch (err) {
+      console.error('[App] Exception during profile check:', err);
     }
   };
 
+  /**
+   * Sub-component to handle route-based state re-validation.
+   * This prevents redirect loops by re-checking profile setup on navigation
+   * if the user is currently stuck in the 'setup' state.
+   */
   /* ── Splash / loading screen ── */
   if (appState === 'loading') {
     return (
@@ -75,47 +117,87 @@ function App() {
 
   return (
     <Router>
-      <AnimatePresence mode="wait">
-        <Routes>
-          {/* ── Always-public routes (no auth needed) ── */}
-          <Route path="/join" element={<JoinApartment />} />
-          <Route path="/join/callback" element={<JoinCallback />} />
-
-          {/* ── Not logged in ── */}
-          {appState === 'public' && (
-            <>
-              <Route path="/" element={<HomeWrapper />} />
-              <Route path="/login" element={<Login />} />
-              <Route path="*" element={<Navigate to="/" replace />} />
-            </>
-          )}
-
-          {/* ── Logged in but profile incomplete → force setup ── */}
-          {appState === 'setup' && (
-            <>
-              <Route path="/setup" element={<CompleteProfile />} />
-              {/* Redirect every other route to setup */}
-              <Route path="*" element={<Navigate to="/setup" replace />} />
-            </>
-          )}
-
-          {/* ── Fully set up → main app ── */}
-          {appState === 'ready' && (
-            <Route path="/" element={<Layout />}>
-              <Route index element={<Dashboard />} />
-              <Route path="expenses" element={<Expenses />} />
-              <Route path="complaints" element={<Complaints />} />
-              <Route path="announcements" element={<Announcements />} />
-              <Route path="residents" element={<Residents />} />
-              <Route path="payments" element={<Payments />} />
-              <Route path="*" element={<Navigate to="/" replace />} />
-            </Route>
-          )}
-        </Routes>
-      </AnimatePresence>
+      <AppRoutes 
+        appState={appState} 
+        checkProfileSetup={checkProfileSetup} 
+      />
     </Router>
   );
 }
+
+/**
+ * Stable component to handle routing and guard-based redirects.
+ * Moved outside the main App to prevent infinite re-creation loops.
+ */
+const AppRoutes = ({ appState, checkProfileSetup }: { 
+  appState: AppState, 
+  checkProfileSetup: (id: string) => Promise<void> 
+}) => {
+  const { pathname } = window.location;
+
+  useEffect(() => {
+    // Check if we just finished onboarding and are still in 'setup' state
+    const recheckIfSetup = async () => {
+       if (appState !== 'setup') return;
+
+       const { data: { session } } = await supabase.auth.getSession();
+       if (session) {
+         // Re-check profile if on root or join paths
+         if (pathname === '/' || pathname === '/join/callback' || pathname === '/setup') {
+            checkProfileSetup(session.user.id);
+         }
+       }
+    };
+    
+    // Slight debounce to let redirects settle
+    const handler = setTimeout(recheckIfSetup, 100);
+    return () => clearTimeout(handler);
+  }, [pathname, appState]); // Watch both path and state
+
+  return (
+    <AnimatePresence mode="wait">
+      <Routes>
+        {/* ── Always-public routes (no auth needed) ── */}
+        <Route path="/join/:token?" element={<JoinApartment />} />
+        <Route path="/join/callback" element={<JoinCallback />} />
+
+        {/* ── Not logged in ── */}
+        {appState === 'public' && (
+          <>
+            <Route path="/" element={<HomeWrapper />} />
+            <Route path="/login" element={<Login />} />
+            <Route path="*" element={<Navigate to="/" replace />} />
+          </>
+        )}
+
+        {/* ── Logged in but profile incomplete → force setup ── */}
+        {appState === 'setup' && (
+          <>
+            <Route path="/setup" element={<CompleteProfile />} />
+            {/* Allow routes like /join/:token to stay accessible! */}
+            <Route path="/join/:token?" element={<JoinApartment />} />
+            <Route path="/join/callback" element={<JoinCallback />} />
+            {/* Catch-all redirect to setup only if NOT on an allowed route */}
+            <Route path="*" element={<Navigate to="/setup" replace />} />
+          </>
+        )}
+
+        {/* ── Fully set up → main app ── */}
+        {appState === 'ready' && (
+          <Route path="/" element={<Layout />}>
+            <Route index element={<Dashboard />} />
+            <Route path="expenses" element={<Expenses />} />
+            <Route path="complaints" element={<Complaints />} />
+            <Route path="announcements" element={<Announcements />} />
+            <Route path="residents" element={<Residents />} />
+            <Route path="payments" element={<Payments />} />
+            <Route path="*" element={<Navigate to="/" replace />} />
+          </Route>
+        )}
+      </Routes>
+    </AnimatePresence>
+  );
+};
 
 // Wrapper for Home to pass the login navigation handler
 const HomeWrapper = () => {

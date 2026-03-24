@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useSearchParams, useNavigate } from 'react-router-dom';
+import { useSearchParams, useNavigate, useParams } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
@@ -18,8 +18,9 @@ type InviteStatus = 'idle' | 'loading' | 'valid' | 'invalid' | 'expired' | 'acce
 export const JoinApartment = () => {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
-
-  const tokenFromUrl = searchParams.get('token') || '';
+  const { token: routeToken } = useParams();
+  
+  const tokenFromUrl = routeToken || searchParams.get('token') || '';
 
   const [manualToken, setManualToken]   = useState('');
   const [inviteStatus, setInviteStatus] = useState<InviteStatus>('idle');
@@ -78,6 +79,9 @@ export const JoinApartment = () => {
       provider: 'google',
       options: {
         redirectTo: window.location.origin + '/join/callback',
+        queryParams: {
+          prompt: 'select_account'
+        }
       },
     });
 

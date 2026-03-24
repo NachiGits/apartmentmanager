@@ -60,6 +60,13 @@ export const JoinCallback = () => {
 
       // 4. Update user profile with apartment_id and role
       setMessage('Setting up your profile...');
+      
+      // Fetch existing role to avoid downgrading
+      const { data: existingProfile } = await supabase.from('profiles').select('role').eq('id', user.id).single();
+      const userRole = (existingProfile?.role && ['SUPER_ADMIN', 'ADMIN', 'RESIDENT'].includes(existingProfile.role)) 
+        ? existingProfile.role 
+        : 'RESIDENT';
+
       const { error: profileError } = await supabase
         .from('profiles')
         .upsert({
@@ -68,12 +75,28 @@ export const JoinCallback = () => {
           full_name:    user.user_metadata?.full_name || user.email?.split('@')[0],
           avatar_url:   user.user_metadata?.avatar_url,
           apartment_id: apartmentId,
-          unit_number:  unitNumber || null,
-          role:         'MEMBER',
+          unit_number:  invite.unit_number || null,
+          role:         userRole, // Use valid role from profiles enum
           updated_at:   new Date().toISOString(),
         });
 
       if (profileError) throw new Error('Failed to update your profile.');
+
+      // 4.5 Add to apartment_members (multi-tenancy)
+      const { error: memberError } = await supabase
+        .from('apartment_members')
+        .upsert({
+          profile_id:   user.id,
+          apartment_id: apartmentId,
+          role:         'MEMBER'
+        });
+
+      if (memberError) {
+        if (memberError.message.includes('more than 3 apartments')) {
+          throw new Error('You cannot belong to more than 3 apartments.');
+        }
+        throw new Error('Failed to link you to the apartment community.');
+      }
 
       // 5. Mark invitation as ACCEPTED
       setMessage('Finalising invitation...');
@@ -90,8 +113,8 @@ export const JoinCallback = () => {
       setStep('success');
       setMessage('Welcome to your community!');
 
-      // Redirect to /setup — App.tsx will detect apartment is now linked and push to dashboard
-      setTimeout(() => navigate('/setup', { replace: true }), 2000);
+      // App state will be re-set to 'ready' by App.tsx when it detects the setup is done
+      setTimeout(() => navigate('/', { replace: true }), 1000);
 
     } catch (err: any) {
       console.error('[JoinCallback]', err);
@@ -145,12 +168,23 @@ export const JoinCallback = () => {
             </div>
             <h2 className="text-2xl font-black text-white mb-2">Registration Failed</h2>
             <p className="text-slate-400 text-sm mb-8 max-w-xs mx-auto">{error}</p>
-            <button
-              onClick={() => navigate('/join', { replace: true })}
-              className="px-6 py-3 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl font-bold text-sm transition-all"
-            >
-              Try Again
-            </button>
+            <div className="flex flex-col gap-3">
+              <button
+                onClick={() => navigate('/join', { replace: true })}
+                className="px-8 py-4 bg-indigo-600 hover:bg-indigo-500 text-white rounded-2xl font-black text-xs uppercase tracking-widest shadow-xl shadow-indigo-600/20 transition-all active:scale-95"
+              >
+                Try Again
+              </button>
+              <button
+                onClick={async () => {
+                  await supabase.auth.signOut();
+                  navigate('/login', { replace: true });
+                }}
+                className="px-8 py-4 bg-white/5 hover:bg-white/10 text-white rounded-2xl font-black text-xs uppercase tracking-widest border border-white/10 transition-all active:scale-95"
+              >
+                Sign Out & Restart
+              </button>
+            </div>
           </>
         )}
       </motion.div>
