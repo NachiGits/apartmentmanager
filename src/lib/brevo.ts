@@ -37,7 +37,7 @@ export async function sendInviteEmail({
     return { success: false, error: 'Brevo API key not configured.' };
   }
 
-  const joinUrl = `${window.location.origin}/join?token=${inviteToken}`;
+  const joinUrl = `${window.location.origin}/join/${inviteToken}`;
 
   const htmlContent = `
     <!DOCTYPE html>

@@ -28,7 +28,7 @@ type Mode = 'choose' | 'join' | 'create' | 'loading' | 'done' | 'error';
 
 const SUPER_ADMIN_EMAIL_KEYWORD = 'mail4nachi';
 
-export const CompleteProfile = () => {
+export const CompleteProfile = ({ onComplete }: { onComplete: () => void }) => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
 
@@ -90,7 +90,8 @@ export const CompleteProfile = () => {
 
     if (error) { setMode('error'); setErrorMsg(error.message); return; }
     setMode('done');
-    setTimeout(() => navigate('/', { replace: true }), 1800);
+    onComplete();
+    setTimeout(() => navigate('/', { replace: true }), 1000);
   };
 
   /* ── JOIN with invite code ── */
@@ -142,7 +143,8 @@ export const CompleteProfile = () => {
       await supabase.from('invitations').update({ status: 'ACCEPTED' }).eq('token', inviteCode.trim());
 
       setMode('done');
-      setTimeout(() => navigate('/', { replace: true }), 1800);
+      onComplete();
+      setTimeout(() => navigate('/', { replace: true }), 1000);
     } catch (err: any) {
       setErrorMsg(err.message);
     } finally {
@@ -191,7 +193,8 @@ export const CompleteProfile = () => {
       if (memErr) throw new Error(memErr.message);
 
       setMode('done');
-      setTimeout(() => navigate('/', { replace: true }), 1800);
+      onComplete();
+      setTimeout(() => navigate('/', { replace: true }), 1000);
     } catch (err: any) {
       setErrorMsg(err.message);
     } finally {

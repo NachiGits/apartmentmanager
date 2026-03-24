@@ -16,9 +16,9 @@ import { CompleteProfile } from './pages/CompleteProfile';
 import { AnimatePresence } from 'framer-motion';
 
 type AppState = 'loading' | 'public' | 'setup' | 'ready';
-
 function App() {
-  const [appState, setAppState]   = useState<AppState>('loading');
+  const [appState, setAppState]     = useState<AppState>('loading');
+  const [isChecking, setIsChecking] = useState(false);
 
   useEffect(() => {
     console.log('[App] Initializing session check...');
@@ -63,8 +63,8 @@ function App() {
    */
   const checkProfileSetup = async (userId: string) => {
     console.log('[App] Checking profile for:', userId);
+    setIsChecking(true);
     try {
-      // Use maybeSingle to avoid errors if profile is missing (brand new user)
       const { data: profile, error } = await supabase
         .from('profiles')
         .select('apartment_id, role, email')
@@ -73,8 +73,6 @@ function App() {
 
       if (error) {
         console.error('[App] Supabase error during profile check:', error);
-        // On transient errors, we might want to retry rather than forcing public
-        // but for now, we'll stay in current state or move to public if it's total failure
         return;
       }
 
@@ -83,18 +81,14 @@ function App() {
       const isSuperAdmin = profile?.role === 'SUPER_ADMIN' || (profile?.email && profile.email.includes('mail4nachi'));
       
       if (profile?.apartment_id || isSuperAdmin) {
-        if (appState !== 'ready') {
-          console.log('[App] Profile is complete. Setting state to READY.');
-          setAppState('ready');
-        }
+        setAppState('ready');
       } else {
-        if (appState !== 'setup') {
-          console.log('[App] Profile incomplete. Setting state to SETUP.');
-          setAppState('setup');
-        }
+        setAppState('setup');
       }
     } catch (err) {
       console.error('[App] Exception during profile check:', err);
+    } finally {
+      setIsChecking(false);
     }
   };
 
@@ -106,10 +100,22 @@ function App() {
   /* ── Splash / loading screen ── */
   if (appState === 'loading') {
     return (
-      <div className="min-h-screen bg-slate-900 flex items-center justify-center">
-        <div className="flex flex-col items-center gap-4">
-          <div className="w-12 h-12 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin" />
-          <span className="text-indigo-200 font-black tracking-widest text-[10px] uppercase">Loading</span>
+      <div className="min-h-screen bg-slate-950 flex flex-col items-center justify-center relative overflow-hidden">
+        {/* Animated background blobs to mask the flicker transitions better */}
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[500px] h-[500px] bg-indigo-600/20 rounded-full blur-[120px] animate-pulse" />
+        
+        <div className="relative flex flex-col items-center gap-6">
+          <div className="relative">
+            <div className="w-16 h-16 border-4 border-indigo-500/20 rounded-full" />
+            <div className="absolute top-0 left-0 w-16 h-16 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin" />
+            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2">
+              <div className="w-2 h-2 bg-indigo-400 rounded-full animate-ping" />
+            </div>
+          </div>
+          <div className="flex flex-col items-center gap-1">
+            <span className="text-white font-black tracking-[0.3em] text-[11px] uppercase ml-[0.3em]">HomeConnect</span>
+            <span className="text-indigo-400/60 font-bold text-[8px] uppercase tracking-widest">Initialising Session</span>
+          </div>
         </div>
       </div>
     );
@@ -119,6 +125,7 @@ function App() {
     <Router>
       <AppRoutes 
         appState={appState} 
+        isChecking={isChecking}
         checkProfileSetup={checkProfileSetup} 
       />
     </Router>
@@ -129,30 +136,33 @@ function App() {
  * Stable component to handle routing and guard-based redirects.
  * Moved outside the main App to prevent infinite re-creation loops.
  */
-const AppRoutes = ({ appState, checkProfileSetup }: { 
+const AppRoutes = ({ appState, isChecking, checkProfileSetup }: { 
   appState: AppState, 
+  isChecking: boolean,
   checkProfileSetup: (id: string) => Promise<void> 
 }) => {
   const { pathname } = window.location;
 
   useEffect(() => {
-    // Check if we just finished onboarding and are still in 'setup' state
     const recheckIfSetup = async () => {
-       if (appState !== 'setup') return;
+       if (appState !== 'setup' || isChecking) return;
 
        const { data: { session } } = await supabase.auth.getSession();
        if (session) {
          // Re-check profile if on root or join paths
-         if (pathname === '/' || pathname === '/join/callback' || pathname === '/setup') {
+         const targetPaths = ['/', '/join/callback', '/setup'];
+         const isTargetPath = targetPaths.some(p => pathname.startsWith(p));
+         
+         if (isTargetPath) {
             checkProfileSetup(session.user.id);
          }
        }
     };
     
-    // Slight debounce to let redirects settle
-    const handler = setTimeout(recheckIfSetup, 100);
+    // Very short debounce
+    const handler = setTimeout(recheckIfSetup, 50);
     return () => clearTimeout(handler);
-  }, [pathname, appState]); // Watch both path and state
+  }, [pathname, appState, isChecking]);
 
   return (
     <AnimatePresence mode="wait">
@@ -173,12 +183,18 @@ const AppRoutes = ({ appState, checkProfileSetup }: {
         {/* ── Logged in but profile incomplete → force setup ── */}
         {appState === 'setup' && (
           <>
-            <Route path="/setup" element={<CompleteProfile />} />
+            <Route path="/setup" element={<CompleteProfile onComplete={() => {
+              supabase.auth.getSession().then(({ data: { session } }) => {
+                if (session) checkProfileSetup(session.user.id);
+              });
+            }} />} />
             {/* Allow routes like /join/:token to stay accessible! */}
             <Route path="/join/:token?" element={<JoinApartment />} />
             <Route path="/join/callback" element={<JoinCallback />} />
-            {/* Catch-all redirect to setup only if NOT on an allowed route */}
-            <Route path="*" element={<Navigate to="/setup" replace />} />
+            {/* Catch-all redirect to setup only if NOT on an allowed route and NOT already checking */}
+            {!isChecking && (
+              <Route path="*" element={<Navigate to="/setup" replace />} />
+            )}
           </>
         )}
 
