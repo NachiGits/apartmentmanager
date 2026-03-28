@@ -21,11 +21,18 @@ import { supabase } from '../lib/supabase';
 export const Layout = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [user, setUser] = useState<any>(null);
+  const [userRole, setUserRole] = useState<string | null>(null);
   const navigate = useNavigate();
   const location = useLocation();
 
   useEffect(() => {
-    supabase.auth.getUser().then(({ data: { user } }) => setUser(user));
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      setUser(user);
+      if (user) {
+        supabase.from('profiles').select('role').eq('id', user.id).single()
+          .then(({ data }) => setUserRole(data?.role || 'RESIDENT'));
+      }
+    });
   }, []);
 
   const handleLogout = async () => {
@@ -41,6 +48,10 @@ export const Layout = () => {
     { icon: Megaphone, label: 'Announcements', path: '/announcements' },
     { icon: Users, label: 'Residents', path: '/residents' },
   ];
+
+  if (userRole === 'SUPER_ADMIN') {
+    navItems.push({ icon: Users, label: 'Users', path: '/?tab=users' });
+  }
 
   const toggleMenu = () => setIsMenuOpen(!isMenuOpen);
 
