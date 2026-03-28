@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Outlet, NavLink, useNavigate } from 'react-router-dom';
+import { Outlet, NavLink, useNavigate, useLocation } from 'react-router-dom';
 import { 
   Building2, 
   LayoutDashboard, 
@@ -11,15 +11,18 @@ import {
   Bell,
   Menu,
   X,
-  CreditCard
+  CreditCard,
+  Search,
+  ChevronDown
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { supabase } from '../lib/supabase';
 
 export const Layout = () => {
-  const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [user, setUser] = useState<any>(null);
   const navigate = useNavigate();
+  const location = useLocation();
 
   useEffect(() => {
     supabase.auth.getUser().then(({ data: { user } }) => setUser(user));
@@ -39,107 +42,194 @@ export const Layout = () => {
     { icon: Users, label: 'Residents', path: '/residents' },
   ];
 
+  const toggleMenu = () => setIsMenuOpen(!isMenuOpen);
+
   return (
-    <div className="flex h-screen bg-surface-50 dark:bg-surface-950 overflow-hidden text-surface-900 dark:text-surface-50">
-      {/* Sidebar */}
-      <motion.aside 
-        initial={false}
-        animate={{ width: sidebarOpen ? 280 : 80 }}
-        className="glass fixed h-[calc(100vh-2rem)] m-4 z-50 border border-white/20 dark:border-white/5 bg-white/40 dark:bg-slate-900/40 backdrop-blur-2xl flex flex-col shadow-2xl transition-all duration-300"
-      >
-        <div className="p-6 flex items-center justify-between">
-          <div className={`flex items-center gap-3 ${!sidebarOpen && 'hidden'}`}>
-            <div className="p-2.5 bg-gradient-premium rounded-xl text-white shadow-lg shadow-emerald-500/20">
-              <Building2 size={22} strokeWidth={2.5} />
+    <div className="min-h-screen bg-surface-50 dark:bg-surface-950 text-surface-900 dark:text-surface-50 flex flex-col">
+      {/* Top Premium Navigation */}
+      <header className="sticky top-0 z-50 w-full">
+        {/* Main Header */}
+        <div className="glass mx-0 md:mx-4 mt-0 md:mt-4 border-b md:border border-white/20 dark:border-white/5 bg-white/70 dark:bg-slate-900/70 backdrop-blur-2xl shadow-xl flex flex-col transition-all duration-300">
+          <div className="px-4 md:px-8 py-3 md:py-4 flex items-center justify-between">
+            {/* Logo Section */}
+            <div className="flex items-center gap-3">
+              <div className="p-2 bg-gradient-premium rounded-xl text-white shadow-lg shadow-emerald-500/20 active:scale-95 transition-transform cursor-pointer" onClick={() => navigate('/')}>
+                <Building2 size={24} strokeWidth={2.5} />
+              </div>
+              <div className="flex flex-col">
+                <span className="font-extrabold text-lg md:text-xl tracking-tight text-gradient leading-none">HomeConnect</span>
+                <span className="text-[10px] font-bold text-surface-400 uppercase tracking-widest mt-1 hidden xs:block">Apartment Manager</span>
+              </div>
             </div>
-            <span className="font-extrabold text-xl tracking-tight text-gradient">HomeConnect</span>
+
+            {/* Desktop Navigation Links */}
+            <nav className="hidden lg:flex items-center gap-1 mx-8">
+              {navItems.map((item) => (
+                <NavLink
+                  key={item.path}
+                  to={item.path}
+                  className={({ isActive }) => `
+                    flex items-center gap-2 px-4 py-2 rounded-xl transition-all duration-300 group
+                    ${isActive 
+                      ? 'bg-primary/10 text-primary font-bold' 
+                      : 'text-surface-500 dark:text-surface-400 hover:bg-black/5 dark:hover:bg-white/5 hover:text-surface-900 dark:hover:text-surface-100'}
+                  `}
+                >
+                  <item.icon size={18} className="transition-transform group-hover:scale-110" />
+                  <span className="text-sm">{item.label}</span>
+                </NavLink>
+              ))}
+            </nav>
+
+            {/* Right Side Actions */}
+            <div className="flex items-center gap-2 md:gap-4">
+              <button className="hidden sm:flex p-2.5 rounded-xl hover:bg-black/5 dark:hover:bg-white/5 text-surface-500 transition-all active:scale-90">
+                <Search size={20} />
+              </button>
+              
+              <button className="p-2.5 rounded-xl bg-white dark:bg-white/5 border border-black/5 dark:border-white/5 shadow-sm hover:shadow-md transition-all relative active:scale-90 group">
+                <Bell size={20} className="text-surface-500 group-hover:text-primary transition-colors" />
+                <span className="absolute top-2.5 right-2.5 w-2 h-2 bg-primary rounded-full border-2 border-white dark:border-slate-800"></span>
+              </button>
+
+              <div className="h-8 w-px bg-black/5 dark:bg-white/5 mx-1 hidden xs:block"></div>
+
+              <div className="flex items-center gap-3">
+                <div className="relative group cursor-pointer">
+                  <div className="h-10 w-10 md:h-11 md:w-11 rounded-2xl bg-gradient-premium flex items-center justify-center text-white font-black text-lg overflow-hidden shadow-lg shadow-emerald-500/20 border-2 border-white dark:border-white/10 active:scale-95 transition-transform">
+                    {user?.user_metadata?.avatar_url ? (
+                      <img src={user.user_metadata.avatar_url} alt="Profile" className="w-full h-full object-cover" />
+                    ) : (
+                      user?.user_metadata?.full_name?.charAt(0) || 'U'
+                    )}
+                  </div>
+                </div>
+
+                {/* Mobile Menu Toggle */}
+                <button 
+                  onClick={toggleMenu}
+                  className="lg:hidden p-2.5 bg-black/5 dark:bg-white/5 rounded-xl text-surface-600 dark:text-surface-400 active:scale-90 transition-all"
+                >
+                  {isMenuOpen ? <X size={22} /> : <Menu size={22} />}
+                </button>
+
+                {/* Sign Out Button (Desktop) */}
+                <button 
+                  onClick={handleLogout}
+                  className="hidden lg:flex p-2.5 hover:bg-red-500/10 text-surface-400 hover:text-red-500 rounded-xl transition-all active:scale-90"
+                  title="Sign Out"
+                >
+                  <LogOut size={20} />
+                </button>
+              </div>
+            </div>
           </div>
-          <button 
-            onClick={() => setSidebarOpen(!sidebarOpen)} 
-            className="p-2.5 hover:bg-white/50 dark:hover:bg-white/5 rounded-xl transition-all duration-200 text-surface-600 active:scale-95"
-          >
-            {sidebarOpen ? <X size={18} /> : <Menu size={18} />}
-          </button>
+
+          {/* Mobile Quick Nav (Horizontal Scroll) */}
+          <div className="lg:hidden w-full overflow-hidden border-t border-black/5 dark:border-white/5">
+            <div className="flex items-center gap-2 px-4 py-2 overflow-x-auto no-scrollbar scroll-smooth">
+              {navItems.map((item) => (
+                <NavLink
+                  key={item.path}
+                  to={item.path}
+                  className={({ isActive }) => `
+                    flex items-center gap-2 px-4 py-2.5 rounded-full whitespace-nowrap transition-all
+                    ${isActive 
+                      ? 'bg-primary text-white shadow-lg shadow-emerald-500/20 font-bold' 
+                      : 'bg-black/5 dark:bg-white/5 text-surface-600 dark:text-surface-400 hover:text-surface-900'}
+                  `}
+                >
+                  <item.icon size={16} />
+                  <span className="text-xs uppercase tracking-wider font-bold">{item.label}</span>
+                </NavLink>
+              ))}
+            </div>
+          </div>
         </div>
 
-        <nav className="flex-1 px-3 py-6 space-y-2 overflow-y-auto no-scrollbar">
-          {navItems.map((item) => (
-            <NavLink
-              key={item.path}
-              to={item.path}
-              className={({ isActive }) => `
-                flex items-center gap-4 px-4 py-3.5 rounded-2xl transition-all duration-300 group relative
-                ${isActive 
-                  ? 'bg-white dark:bg-white/10 text-primary shadow-premium' 
-                  : 'hover:bg-white/30 dark:hover:bg-white/5 text-surface-500 dark:text-surface-400 hover:text-surface-900 dark:hover:text-surface-100'}
-              `}
+        {/* Mobile Full Menu Overlay */}
+        <AnimatePresence>
+          {isMenuOpen && (
+            <motion.div
+              initial={{ opacity: 0, y: -20 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -20 }}
+              className="absolute top-full left-0 right-0 m-4 lg:hidden"
             >
-              {({ isActive }) => (
-                <>
-                  <item.icon size={20} className={`${sidebarOpen ? '' : 'mx-auto'} transition-transform duration-300 group-hover:scale-110`} />
-                  {sidebarOpen && <span className="font-semibold tracking-tight">{item.label}</span>}
-                  {/* Active Indicator Overlay */}
-                  {isActive && (
-                    <motion.div 
-                      layoutId="activeNav"
-                      className="absolute left-2 w-1 h-6 bg-primary rounded-full"
-                    />
-                  )}
-                </>
-              )}
-            </NavLink>
-          ))}
-        </nav>
+              <div className="glass bg-white dark:bg-slate-900 p-4 shadow-2xl border border-white/20 dark:border-white/5">
+                <div className="grid grid-cols-2 gap-3 mb-6">
+                  {navItems.map((item) => (
+                    <NavLink
+                      key={item.path}
+                      onClick={() => setIsMenuOpen(false)}
+                      to={item.path}
+                      className={({ isActive }) => `
+                        flex flex-col items-center justify-center p-4 rounded-2xl transition-all gap-2
+                        ${isActive 
+                          ? 'bg-primary/10 text-primary border-2 border-primary/20' 
+                          : 'bg-black/5 dark:bg-white/5 text-surface-600 dark:text-surface-400 border-2 border-transparent'}
+                      `}
+                    >
+                      <item.icon size={24} />
+                      <span className="text-xs font-bold">{item.label}</span>
+                    </NavLink>
+                  ))}
+                </div>
+                
+                <div className="border-t border-black/5 dark:border-white/5 pt-4">
+                  <div className="flex items-center gap-3 mb-4 px-2">
+                    <div className="h-10 w-10 rounded-full bg-gradient-premium flex items-center justify-center text-white font-bold">
+                       {user?.user_metadata?.full_name?.charAt(0) || 'U'}
+                    </div>
+                    <div className="flex flex-col">
+                      <span className="text-sm font-bold">{user?.user_metadata?.full_name || 'Resident'}</span>
+                      <span className="text-[10px] text-surface-500 uppercase tracking-widest font-bold">Admin Panel</span>
+                    </div>
+                  </div>
+                  <button 
+                    onClick={handleLogout}
+                    className="flex items-center justify-center gap-2 w-full p-4 bg-red-500/10 text-red-500 rounded-2xl font-bold active:scale-95 transition-all"
+                  >
+                    <LogOut size={20} />
+                    Sign Out
+                  </button>
+                </div>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </header>
 
-        <div className="p-3 mt-auto border-t border-black/5 dark:border-white/5">
-          <button 
-            onClick={handleLogout}
-            className="flex items-center gap-4 w-full px-4 py-3.5 text-surface-500 dark:text-surface-400 hover:bg-red-500/10 hover:text-red-500 rounded-2xl transition-all duration-200 group active:scale-95"
-          >
-            <LogOut size={20} className={`${sidebarOpen ? '' : 'mx-auto'} transition-transform group-hover:-translate-x-1`} />
-            {sidebarOpen && <span className="font-semibold tracking-tight">Sign Out</span>}
-          </button>
-        </div>
-      </motion.aside>
-
-      {/* Main Content */}
-      <main 
-        className="flex-1 overflow-y-auto transition-all duration-500"
-        style={{ marginLeft: sidebarOpen ? 312 : 112 }}
-      >
-        <header className="sticky top-0 z-40 bg-surface-50/50 dark:bg-surface-950/50 backdrop-blur-xl px-12 py-6 flex items-center justify-between border-b border-black/5 dark:border-white/5">
+      {/* Breadcrumb / Page Title Bar (Integrated) */}
+      <div className="px-4 md:px-12 py-4 md:py-8 max-w-7xl mx-auto w-full">
+        <div className="flex items-center justify-between mb-2">
           <div className="flex flex-col">
-            <h1 className="text-xs font-bold text-surface-400 uppercase tracking-[0.2em]">Overview</h1>
-            <p className="text-lg font-bold text-surface-900 dark:text-white">
-              Welcome back, <span className="text-gradient">{user?.user_metadata?.full_name?.split(' ')[0] || 'Member'}</span>
+            <h1 className="text-[10px] font-black text-primary uppercase tracking-[0.3em] mb-0.5 md:mb-1">
+              Active Dashboard
+            </h1>
+            <p className="text-xl md:text-3xl font-black text-surface-900 dark:text-white tracking-tight">
+              {navItems.find(i => i.path === location.pathname)?.label || 'Overview'}
             </p>
           </div>
           
-          <div className="flex items-center gap-6">
-            <button className="p-3 rounded-2xl bg-white dark:bg-white/5 border border-black/5 dark:border-white/5 shadow-sm hover:shadow-md transition-all relative active:scale-95 group">
-              <Bell size={20} className="text-surface-500 group-hover:text-primary transition-colors" />
-              <span className="absolute top-3 right-3 w-2.5 h-2.5 bg-primary rounded-full border-2 border-white dark:border-surface-950 animate-pulse"></span>
-            </button>
-            <div className="flex items-center gap-3 pl-4 border-l border-black/5 dark:border-white/5">
-              <div className="flex flex-col items-end hidden sm:flex">
-                <span className="text-sm font-bold">{user?.user_metadata?.full_name || 'User'}</span>
-                <span className="text-[10px] font-bold text-primary uppercase tracking-tighter bg-primary/10 px-1.5 py-0.5 rounded-md">Resident</span>
-              </div>
-              <div className="h-12 w-12 rounded-2xl bg-gradient-premium flex items-center justify-center text-white font-black text-xl overflow-hidden shadow-xl shadow-emerald-500/20 border-2 border-white dark:border-white/10 active:scale-95 transition-transform cursor-pointer">
-                {user?.user_metadata?.avatar_url ? (
-                  <img src={user.user_metadata.avatar_url} alt="Profile" className="w-full h-full object-cover" />
-                ) : (
-                  user?.user_metadata?.full_name?.charAt(0) || 'U'
-                )}
-              </div>
-            </div>
+          <div className="hidden md:block">
+             <p className="text-sm font-medium text-surface-500 text-right">
+              Welcome back, <br/>
+              <span className="text-surface-900 dark:text-white font-bold text-base">{user?.user_metadata?.full_name || 'Member'}</span>
+            </p>
           </div>
-        </header>
+        </div>
+      </div>
 
-        <div className="px-12 py-10 max-w-7xl mx-auto">
-          <Outlet />
+      {/* Main Content */}
+      <main className="flex-1 w-full max-w-7xl mx-auto px-4 md:px-12 pb-20">
+        <div className="animate-fade-up">
+           <Outlet />
         </div>
       </main>
+
+      {/* Mobile Interaction - Optional: Bottom minimal bar if needed, but top is requested */}
     </div>
   );
 };
+
