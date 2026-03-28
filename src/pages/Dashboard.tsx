@@ -303,9 +303,9 @@ export const Dashboard = () => {
                     <p className="text-surface-400 font-bold uppercase tracking-widest text-xs">No active apartment link found.</p>
                   </div>
                 ) : apartments.map((apt) => (
-                  <div key={apt.id} className="group p-6 bg-surface-50 dark:bg-white/5 rounded-[2rem] border border-black/5 dark:border-white/10 hover:border-primary/30 transition-all flex items-center justify-between shadow-sm">
-                     <div className="flex items-center gap-6">
-                        <div className="w-16 h-16 rounded-2xl bg-white dark:bg-white/10 shadow-lg flex items-center justify-center border border-black/5 text-primary">
+                  <div key={apt.id} className="group p-5 md:p-6 bg-surface-50 dark:bg-white/5 rounded-[2rem] border border-black/5 dark:border-white/10 hover:border-primary/30 transition-all flex flex-col md:flex-row md:items-center justify-between shadow-sm">
+                     <div className="flex items-center gap-4 md:gap-6">
+                        <div className="w-14 h-14 md:w-16 md:h-16 rounded-2xl bg-white dark:bg-white/10 shadow-lg flex items-center justify-center border border-black/5 text-primary">
                            <Building2 size={32} strokeWidth={2.5} />
                         </div>
                         <div>
@@ -325,12 +325,12 @@ export const Dashboard = () => {
                            )}
                         </div>
                      </div>
-                     <div className="flex gap-3 pr-2">
+                     <div className="flex flex-col sm:flex-row gap-2 mt-4 sm:mt-0 w-full sm:w-auto">
                         {(userRole === 'ADMIN' || userRole === 'SUPER_ADMIN') ? (
                           <>
                             <button 
                               onClick={() => fetchDirectory(apt.id)}
-                              className="px-6 py-3 bg-white dark:bg-white/10 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-black hover:text-white transition-all shadow-sm border border-black/5"
+                              className="px-4 py-3 bg-white dark:bg-white/10 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-black hover:text-white transition-all shadow-sm border border-black/5 whitespace-nowrap"
                             >
                                Directory
                             </button>
@@ -341,7 +341,7 @@ export const Dashboard = () => {
                                 setNewAptAddress(apt.address);
                                 setShowCreateApt(true);
                               }}
-                              className="px-6 py-3 bg-white dark:bg-white/10 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-primary hover:text-white transition-all shadow-sm border border-black/5"
+                              className="px-4 py-3 bg-white dark:bg-white/10 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-primary hover:text-white transition-all shadow-sm border border-black/5 whitespace-nowrap"
                             >
                                Modify
                             </button>
@@ -349,9 +349,9 @@ export const Dashboard = () => {
                         ) : (
                           <button 
                             onClick={() => fetchDirectory(apt.id)}
-                            className="px-8 py-3 bg-indigo-50 text-indigo-600 dark:bg-indigo-500/10 dark:text-indigo-400 border border-indigo-500/20 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-indigo-600 hover:text-white transition-all"
+                            className="px-6 py-3 bg-indigo-50 text-indigo-600 dark:bg-indigo-500/10 dark:text-indigo-400 border border-indigo-500/20 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-indigo-600 hover:text-white transition-all w-full"
                           >
-                             Community Directory
+                             Directory
                           </button>
                         )}
                      </div>
@@ -366,7 +366,7 @@ export const Dashboard = () => {
                       setNewAptAddress('');
                       setShowCreateApt(true);
                     }}
-                    className="p-8 border-2 border-dashed border-surface-200 dark:border-white/10 rounded-[2rem] text-surface-400 font-black text-xs uppercase tracking-widest hover:border-primary hover:text-primary transition-all flex items-center justify-center gap-3 group"
+                    className="w-full p-8 border-2 border-dashed border-surface-200 dark:border-white/10 rounded-[2rem] text-surface-400 font-black text-[10px] uppercase tracking-widest hover:border-primary hover:text-primary transition-all flex items-center justify-center gap-3 group"
                   >
                     <Plus className="group-hover:rotate-90 transition-transform" /> Add New Community
                   </button>

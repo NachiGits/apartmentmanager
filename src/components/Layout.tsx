@@ -83,20 +83,20 @@ export const Layout = () => {
 
             {/* Right Side Actions */}
             <div className="flex items-center gap-2 md:gap-4">
-              {/* Desktop Actions */}
-              <button className="hidden sm:flex p-2.5 rounded-xl hover:bg-black/5 dark:hover:bg-white/5 text-surface-500 transition-all active:scale-90">
+              {/* Desktop Actions - Only show on Large Screens */}
+              <button className="hidden lg:flex p-2.5 rounded-xl hover:bg-black/5 dark:hover:bg-white/5 text-surface-500 transition-all active:scale-90">
                 <Search size={20} />
               </button>
               
-              <button className="hidden sm:flex p-2.5 rounded-xl bg-white dark:bg-white/5 border border-black/5 dark:border-white/5 shadow-sm hover:shadow-md transition-all relative active:scale-90 group">
+              <button className="hidden lg:flex p-2.5 rounded-xl bg-white dark:bg-white/5 border border-black/5 dark:border-white/5 shadow-sm hover:shadow-md transition-all relative active:scale-90 group">
                 <Bell size={20} className="text-surface-500 group-hover:text-primary transition-colors" />
                 <span className="absolute top-2.5 right-2.5 w-2 h-2 bg-primary rounded-full border-2 border-white dark:border-slate-800"></span>
               </button>
 
-              <div className="h-8 w-px bg-black/5 dark:bg-white/5 mx-1 hidden md:block"></div>
+              <div className="h-8 w-px bg-black/5 dark:bg-white/5 mx-1 hidden lg:block"></div>
 
               <div className="flex items-center gap-2">
-                <div className="hidden sm:block relative group cursor-pointer">
+                <div className="hidden lg:block relative group cursor-pointer">
                   <div className="h-10 w-10 rounded-2xl bg-gradient-premium flex items-center justify-center text-white font-black text-lg overflow-hidden shadow-lg shadow-emerald-500/20 border-2 border-white dark:border-white/10 active:scale-95 transition-transform">
                     {user?.user_metadata?.avatar_url ? (
                       <img src={user.user_metadata.avatar_url} alt="Profile" className="w-full h-full object-cover" />
@@ -106,10 +106,10 @@ export const Layout = () => {
                   </div>
                 </div>
 
-                {/* Mobile Menu Toggle - Always visible on small screens */}
+                {/* Mobile Menu Toggle - Visible on anything smaller than LG */}
                 <button 
                   onClick={toggleMenu}
-                  className="p-2.5 bg-primary text-white md:bg-black/5 md:dark:bg-white/5 rounded-xl md:text-surface-600 md:dark:text-surface-400 active:scale-90 transition-all shadow-lg shadow-emerald-500/20 md:shadow-none"
+                  className="lg:hidden p-2.5 bg-primary text-white rounded-xl active:scale-90 transition-all shadow-lg shadow-emerald-500/30"
                 >
                   {isMenuOpen ? <X size={22} /> : <Menu size={22} />}
                 </button>
@@ -129,19 +129,19 @@ export const Layout = () => {
           {/* Mobile Quick Nav (Horizontal Scroll) - Controlled visibility */}
           {!isMenuOpen && (
             <div className="lg:hidden w-full overflow-hidden border-t border-black/5 dark:border-white/5 animate-fade-up">
-              <div className="flex items-center gap-2 px-4 py-2 overflow-x-auto no-scrollbar scroll-smooth">
+              <div className="flex items-center gap-1 px-4 py-2 overflow-x-auto no-scrollbar scroll-smooth">
                 {navItems.map((item) => (
                   <NavLink
                     key={item.path}
                     to={item.path}
                     className={({ isActive }) => `
-                      flex items-center gap-2 px-4 py-2.5 rounded-full whitespace-nowrap transition-all
+                      flex items-center gap-2 px-3.5 py-2.5 rounded-full whitespace-nowrap transition-all
                       ${isActive 
                         ? 'bg-primary text-white shadow-lg shadow-emerald-500/20 font-bold' 
                         : 'bg-black/5 dark:bg-white/5 text-surface-600 dark:text-surface-400 hover:text-surface-900'}
                     `}
                   >
-                    <item.icon size={16} />
+                    <item.icon size={15} />
                     <span className="text-[10px] uppercase tracking-wider font-bold">{item.label}</span>
                   </NavLink>
                 ))}
@@ -157,48 +157,48 @@ export const Layout = () => {
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
-              className="fixed inset-0 z-[100] flex flex-col bg-white dark:bg-surface-950"
+              className="fixed inset-0 z-[100] flex flex-col bg-slate-50 dark:bg-surface-950"
             >
               {/* Header inside the overlay */}
-              <div className="px-6 py-6 border-b border-black/5 dark:border-white/5 flex items-center justify-between">
+              <div className="px-6 py-6 border-b border-black/5 dark:border-white/5 flex items-center justify-between bg-white dark:bg-surface-900 shadow-sm">
                 <div className="flex items-center gap-3">
-                  <div className="p-2.5 bg-gradient-premium rounded-2xl text-white shadow-xl shadow-emerald-500/20">
-                    <Building2 size={24} strokeWidth={2.5} />
+                  <div className="p-2 bg-gradient-premium rounded-xl text-white shadow-lg shadow-emerald-500/20">
+                    <Building2 size={22} strokeWidth={2.5} />
                   </div>
-                  <span className="font-black text-2xl tracking-tighter text-gradient leading-none">HomeConnect</span>
+                  <span className="font-extrabold text-xl tracking-tight text-gradient leading-none">HomeConnect</span>
                 </div>
                 <button 
                   onClick={toggleMenu}
-                  className="p-3 bg-black/5 dark:bg-white/5 rounded-2xl active:scale-90 transition-all"
+                  className="p-2.5 bg-black/5 dark:bg-white/5 rounded-xl active:scale-90 transition-all"
                 >
-                  <X size={24} />
+                  <X size={22} />
                 </button>
               </div>
 
-              {/* Grid Navigation */}
-              <div className="flex-1 overflow-y-auto p-6 flex flex-col justify-center">
-                <div className="grid grid-cols-2 gap-4">
+              {/* Grid Navigation - More compact to fit without scrolling */}
+              <div className="flex-1 overflow-y-auto p-4 flex flex-col justify-center">
+                <div className="grid grid-cols-2 gap-3">
                   {navItems.map((item, idx) => (
                     <motion.div
                       key={item.path}
-                      initial={{ opacity: 0, y: 20 }}
-                      animate={{ opacity: 1, y: 0 }}
+                      initial={{ opacity: 0, scale: 0.9 }}
+                      animate={{ opacity: 1, scale: 1 }}
                       transition={{ delay: idx * 0.05 }}
                     >
                       <NavLink
                         onClick={() => setIsMenuOpen(false)}
                         to={item.path}
                         className={({ isActive }) => `
-                          flex flex-col items-center justify-center p-8 rounded-[2.5rem] transition-all gap-4 border-2
+                          flex flex-col items-center justify-center py-6 px-4 rounded-[2rem] transition-all gap-3 border
                           ${isActive 
-                            ? 'bg-primary/5 text-primary border-primary/20 shadow-xl shadow-emerald-500/5 scale-[1.02]' 
-                            : 'bg-surface-50 dark:bg-white/5 text-surface-500 dark:text-surface-400 border-transparent hover:border-black/5'}
+                            ? 'bg-primary/5 text-primary border-primary/20 shadow-md shadow-emerald-500/5' 
+                            : 'bg-white dark:bg-white/5 text-surface-500 dark:text-surface-400 border-black/5 dark:border-white/5'}
                         `}
                       >
-                        <div className={`p-4 rounded-2xl ${location.pathname === item.path ? 'bg-primary text-white' : 'bg-black/5 dark:bg-white/10'}`}>
-                          <item.icon size={28} strokeWidth={2.5} />
+                        <div className={`p-3.5 rounded-xl ${location.pathname === item.path ? 'bg-primary text-white shadow-lg shadow-emerald-500/30' : 'bg-black/5 dark:bg-white/10'}`}>
+                          <item.icon size={22} strokeWidth={2.5} />
                         </div>
-                        <span className="text-sm font-black uppercase tracking-widest">{item.label}</span>
+                        <span className="text-[10px] font-black uppercase tracking-widest leading-none">{item.label}</span>
                       </NavLink>
                     </motion.div>
                   ))}
@@ -206,10 +206,10 @@ export const Layout = () => {
               </div>
               
               {/* Profile Bar in Bottom */}
-              <div className="p-8 border-t border-black/5 dark:border-white/5 bg-surface-50/50 dark:bg-black/20">
-                <div className="flex items-center justify-between mb-8">
-                  <div className="flex items-center gap-4">
-                    <div className="h-14 w-14 rounded-3xl bg-gradient-premium flex items-center justify-center text-white font-black text-2xl overflow-hidden shadow-2xl shadow-emerald-500/20">
+              <div className="p-6 md:p-8 border-t border-black/5 dark:border-white/5 bg-white dark:bg-black/20">
+                <div className="flex items-center justify-between mb-6">
+                  <div className="flex items-center gap-3.5">
+                    <div className="h-12 w-12 rounded-2xl bg-gradient-premium flex items-center justify-center text-white font-black text-xl overflow-hidden shadow-xl shadow-emerald-500/20 divide-x-2 border-2 border-white dark:border-white/10">
                        {user?.user_metadata?.avatar_url ? (
                          <img src={user.user_metadata.avatar_url} alt="Profile" className="w-full h-full object-cover" />
                        ) : (
@@ -217,18 +217,20 @@ export const Layout = () => {
                        )}
                     </div>
                     <div className="flex flex-col">
-                      <p className="text-lg font-black text-surface-900 dark:text-white leading-none mb-1 tracking-tight">{user?.user_metadata?.full_name || 'Resident'}</p>
-                      <span className="text-[10px] font-black text-primary uppercase tracking-[0.3em]">Authorized Access</span>
+                      <p className="text-base font-black text-surface-900 dark:text-white leading-none mb-1 tracking-tight">{user?.user_metadata?.full_name || 'Resident'}</p>
+                      <span className="text-[10px] font-black text-primary uppercase tracking-[0.3em]">Authorized Session</span>
                     </div>
                   </div>
                 </div>
                 
                 <button 
                   onClick={handleLogout}
-                  className="flex items-center justify-center gap-3 w-full p-6 bg-red-500 text-white rounded-3xl font-black text-xs uppercase tracking-[0.2em] shadow-2xl shadow-red-500/20 active:scale-95 transition-all"
+                  className="flex items-center justify-center gap-3 w-full p-5 bg-red-500 text-white rounded-2xl font-black text-[10px] uppercase tracking-[0.2em] shadow-xl shadow-red-500/20 active:scale-95 transition-all"
                 >
-                  <LogOut size={20} />
-                  Secure Sign Out
+                   <div className="p-1.5 bg-white/20 rounded-lg">
+                      <LogOut size={14} />
+                   </div>
+                  Sign Out Securely
                 </button>
               </div>
             </motion.div>
