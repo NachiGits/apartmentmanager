@@ -57,8 +57,6 @@ function App() {
     };
   }, []);
 
-  const [hasNotifiedLogin, setHasNotifiedLogin] = useState(false);
-
   /**
    * Check if the logged-in user has completed their profile (i.e. linked to an apartment).
    */
@@ -89,9 +87,9 @@ function App() {
       const isSuperAdmin = profile?.role === 'SUPER_ADMIN' || (profile?.email && (profile.email.includes('mail4nachi') || profile.email.includes('admin@apartment.com')));
       
       if (profile?.apartment_id || isSuperAdmin) {
-        if (!hasNotifiedLogin) {
+        if (!sessionStorage.getItem('homeconnect_logged_in_notified')) {
           import('react-hot-toast').then(({ toast }) => toast.success('Login Successful!'));
-          setHasNotifiedLogin(true);
+          sessionStorage.setItem('homeconnect_logged_in_notified', 'true');
         }
         setAppState('ready');
       } else {

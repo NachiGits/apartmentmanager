@@ -247,10 +247,11 @@ export const Residents = () => {
                apartment_id: editingResident.apartment_id,
                profile_id: a.profile_id,
                title: 'SQFT Change Request',
-               description: `${editingResident.full_name} from Unit ${editUnitNumber} has requested area updates.`,
+               description: `${editingResident.full_name} from Unit ${editUnitNumber} has requested area updates for ${editingResident.apartment_name}.`,
                type: 'SQFT_REQUEST'
             }));
-            await supabase.from('notifications').insert(notifs);
+            const { error: notifError } = await supabase.from('notifications').insert(notifs);
+            if (notifError) console.error('[Residents] Notification persistence failed:', notifError);
 
             // 2. Email Admin directly
             const { data: adminProf } = await supabase.from('profiles').select('email').eq('id', admins[0].profile_id).single();

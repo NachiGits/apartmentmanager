@@ -13,7 +13,7 @@ import {
   X,
   CreditCard,
   Search,
-  ChevronDown
+  ExternalLink
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { supabase } from '../lib/supabase';
@@ -28,15 +28,35 @@ export const Layout = () => {
   const location = useLocation();
 
   useEffect(() => {
-    supabase.auth.getUser().then(({ data: { user } }) => {
-      setUser(user);
-      if (user) {
-        supabase.from('profiles').select('role').eq('id', user.id).single()
+    let subscription: any = null;
+
+    supabase.auth.getUser().then(({ data: { user: authUser } }) => {
+      setUser(authUser);
+      if (authUser) {
+        supabase.from('profiles').select('role').eq('id', authUser.id).single()
           .then(({ data }) => setUserRole(data?.role || 'RESIDENT'));
         
-        fetchNotifications(user.id);
+        fetchNotifications(authUser.id);
+
+        // REAL-TIME SUBSCRIPTION
+        subscription = supabase
+          .channel(`public:notifications:profile_id=eq.${authUser.id}`)
+          .on('postgres_changes', { 
+            event: 'INSERT', 
+            schema: 'public', 
+            table: 'notifications',
+            filter: `profile_id=eq.${authUser.id}`
+          }, (payload) => {
+            setNotifications(prev => [payload.new, ...prev]);
+            import('react-hot-toast').then(({ toast }) => toast.success('New Request: ' + payload.new.title, { icon: '🔔' }));
+          })
+          .subscribe();
       }
     });
+
+    return () => {
+      if (subscription) supabase.removeChannel(subscription);
+    };
   }, []);
 
   const fetchNotifications = async (userId: string) => {
@@ -62,6 +82,7 @@ export const Layout = () => {
 
   const handleLogout = async () => {
     await supabase.auth.signOut();
+    sessionStorage.removeItem('homeconnect_logged_in_notified');
     import('react-hot-toast').then(({ toast }) => toast.success('Logged out successfully'));
     navigate('/login');
   };
@@ -153,13 +174,25 @@ export const Layout = () => {
                               <div className="p-8 text-center text-slate-400 italic text-xs">No unread alerts</div>
                             ) : (
                               notifications.map(n => (
-                                <div key={n.id} className="p-4 border-b border-slate-50 dark:border-slate-800/50 hover:bg-slate-50 dark:hover:bg-white/5 transition-colors cursor-pointer">
+                                <div 
+                                  key={n.id} 
+                                  onClick={() => {
+                                    if(n.type === 'SQFT_REQUEST') navigate('/residents');
+                                    markAllRead();
+                                  }}
+                                  className="p-4 border-b border-slate-50 dark:border-slate-800/50 hover:bg-indigo-50 dark:hover:bg-indigo-500/10 transition-all cursor-pointer group"
+                                >
                                    <div className="flex gap-3">
-                                      <div className="h-2 w-2 bg-indigo-500 rounded-full shrink-0 mt-1.5"></div>
+                                      <div className={`h-1.5 w-1.5 rounded-full shrink-0 mt-2 ${n.type === 'SQFT_REQUEST' ? 'bg-amber-500' : 'bg-indigo-500'} group-hover:scale-150 transition-transform`}></div>
                                       <div className="flex-1">
-                                         <p className="text-[11px] font-black leading-tight mb-0.5">{n.title}</p>
-                                         <p className="text-[10px] text-slate-500 leading-snug">{n.description}</p>
-                                         <span className="text-[8px] font-bold text-slate-400 mt-1 block uppercase">{new Date(n.created_at).toLocaleDateString()}</span>
+                                         <div className="flex items-center justify-between mb-0.5">
+                                            <p className="text-[10px] font-black leading-tight uppercase tracking-widest text-slate-800 dark:text-slate-200">{n.title || 'Notification'}</p>
+                                            <span className="text-[7px] font-black bg-slate-100 dark:bg-white/10 px-1 rounded uppercase">{new Date(n.created_at).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</span>
+                                         </div>
+                                         <p className="text-[10px] text-slate-500 leading-snug font-medium mb-1.5">{n.description}</p>
+                                         <div className="flex items-center gap-2">
+                                            <span className="text-[8px] font-black text-indigo-500 uppercase flex items-center gap-1">Click to Review <ExternalLink size={8} /></span>
+                                         </div>
                                       </div>
                                    </div>
                                 </div>

@@ -266,6 +266,10 @@ DROP POLICY IF EXISTS "Notification view" ON notifications;
 CREATE POLICY "Notification view" ON notifications FOR SELECT
   USING (is_super_admin() OR profile_id = auth.uid());
 
+DROP POLICY IF EXISTS "Notification insert" ON notifications;
+CREATE POLICY "Notification insert" ON notifications FOR INSERT
+  WITH CHECK (true); -- Allow residents to notify admins
+
 
 -- 5. TRIGGERS
 CREATE OR REPLACE FUNCTION public.handle_new_user()
