@@ -125,76 +125,115 @@ export const Layout = () => {
             </div>
           </div>
 
-          {/* Mobile Quick Nav (Horizontal Scroll) */}
-          <div className="lg:hidden w-full overflow-hidden border-t border-black/5 dark:border-white/5">
-            <div className="flex items-center gap-2 px-4 py-2 overflow-x-auto no-scrollbar scroll-smooth">
-              {navItems.map((item) => (
-                <NavLink
-                  key={item.path}
-                  to={item.path}
-                  className={({ isActive }) => `
-                    flex items-center gap-2 px-4 py-2.5 rounded-full whitespace-nowrap transition-all
-                    ${isActive 
-                      ? 'bg-primary text-white shadow-lg shadow-emerald-500/20 font-bold' 
-                      : 'bg-black/5 dark:bg-white/5 text-surface-600 dark:text-surface-400 hover:text-surface-900'}
-                  `}
-                >
-                  <item.icon size={16} />
-                  <span className="text-xs uppercase tracking-wider font-bold">{item.label}</span>
-                </NavLink>
-              ))}
+          {/* Mobile Quick Nav (Horizontal Scroll) - Hidden when menu is open */}
+          {!isMenuOpen && (
+            <div className="lg:hidden w-full overflow-hidden border-t border-black/5 dark:border-white/5 animate-fade-up">
+              <div className="flex items-center gap-2 px-4 py-2 overflow-x-auto no-scrollbar scroll-smooth">
+                {navItems.map((item) => (
+                  <NavLink
+                    key={item.path}
+                    to={item.path}
+                    className={({ isActive }) => `
+                      flex items-center gap-2 px-4 py-2.5 rounded-full whitespace-nowrap transition-all
+                      ${isActive 
+                        ? 'bg-primary text-white shadow-lg shadow-emerald-500/20 font-bold' 
+                        : 'bg-black/5 dark:bg-white/5 text-surface-600 dark:text-surface-400 hover:text-surface-900'}
+                    `}
+                  >
+                    <item.icon size={16} />
+                    <span className="text-[10px] uppercase tracking-wider font-bold">{item.label}</span>
+                  </NavLink>
+                ))}
+              </div>
             </div>
-          </div>
+          )}
         </div>
 
-        {/* Mobile Full Menu Overlay */}
+        {/* Mobile Full Menu Overlay - Professional Side Drawer */}
         <AnimatePresence>
           {isMenuOpen && (
             <motion.div
-              initial={{ opacity: 0, y: -20 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -20 }}
-              className="absolute top-full left-0 right-0 m-4 lg:hidden"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="fixed inset-0 z-[100] lg:hidden"
             >
-              <div className="glass bg-white dark:bg-slate-900 p-4 shadow-2xl border border-white/20 dark:border-white/5">
-                <div className="grid grid-cols-2 gap-3 mb-6">
+              {/* Dark Overlay with Blur */}
+              <motion.div 
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                onClick={toggleMenu}
+                className="absolute inset-0 bg-surface-950/60 backdrop-blur-sm" 
+              />
+              
+              <motion.div
+                initial={{ x: '100%' }}
+                animate={{ x: 0 }}
+                exit={{ x: '100%' }}
+                transition={{ type: 'spring', damping: 25, stiffness: 200 }}
+                className="absolute top-0 right-0 h-full w-[280px] bg-white dark:bg-surface-900 shadow-2xl flex flex-col border-l border-black/5 dark:border-white/5"
+              >
+                {/* Drawer Header */}
+                <div className="p-6 flex items-center justify-between border-b border-black/5 dark:border-white/5">
+                  <div className="flex items-center gap-3">
+                    <div className="p-2 bg-gradient-premium rounded-xl text-white">
+                      <Building2 size={20} strokeWidth={2.5} />
+                    </div>
+                    <span className="font-exrabold text-lg tracking-tight text-gradient leading-none">HomeConnect</span>
+                  </div>
+                  <button 
+                    onClick={toggleMenu}
+                    className="p-2 hover:bg-black/5 dark:hover:bg-white/5 rounded-xl transition-colors"
+                  >
+                    <X size={20} />
+                  </button>
+                </div>
+
+                {/* Navigation Links */}
+                <nav className="flex-1 px-3 py-6 space-y-1 overflow-y-auto no-scrollbar">
                   {navItems.map((item) => (
                     <NavLink
                       key={item.path}
                       onClick={() => setIsMenuOpen(false)}
                       to={item.path}
                       className={({ isActive }) => `
-                        flex flex-col items-center justify-center p-4 rounded-2xl transition-all gap-2
+                        flex items-center gap-4 px-4 py-3.5 rounded-xl transition-all duration-200
                         ${isActive 
-                          ? 'bg-primary/10 text-primary border-2 border-primary/20' 
-                          : 'bg-black/5 dark:bg-white/5 text-surface-600 dark:text-surface-400 border-2 border-transparent'}
+                          ? 'bg-primary/10 text-primary font-bold shadow-sm' 
+                          : 'text-surface-600 dark:text-surface-400 hover:bg-black/5 dark:hover:bg-white/5'}
                       `}
                     >
-                      <item.icon size={24} />
-                      <span className="text-xs font-bold">{item.label}</span>
+                      <item.icon size={20} />
+                      <span className="text-sm font-semibold">{item.label}</span>
                     </NavLink>
                   ))}
-                </div>
+                </nav>
                 
-                <div className="border-t border-black/5 dark:border-white/5 pt-4">
-                  <div className="flex items-center gap-3 mb-4 px-2">
-                    <div className="h-10 w-10 rounded-full bg-gradient-premium flex items-center justify-center text-white font-bold">
-                       {user?.user_metadata?.full_name?.charAt(0) || 'U'}
+                {/* User Info & Footer */}
+                <div className="p-6 border-t border-black/5 dark:border-white/5 bg-surface-50/50 dark:bg-black/20">
+                  <div className="flex items-center gap-3 mb-6">
+                    <div className="h-10 w-10 rounded-xl bg-gradient-premium flex items-center justify-center text-white font-bold text-lg overflow-hidden shrink-0 shadow-lg shadow-emerald-500/10">
+                       {user?.user_metadata?.avatar_url ? (
+                         <img src={user.user_metadata.avatar_url} alt="Profile" className="w-full h-full object-cover" />
+                       ) : (
+                         user?.user_metadata?.full_name?.charAt(0) || 'U'
+                       )}
                     </div>
-                    <div className="flex flex-col">
-                      <span className="text-sm font-bold">{user?.user_metadata?.full_name || 'Resident'}</span>
-                      <span className="text-[10px] text-surface-500 uppercase tracking-widest font-bold">Admin Panel</span>
+                    <div className="flex flex-col min-w-0">
+                      <span className="text-sm font-bold text-surface-900 dark:text-white truncate">{user?.user_metadata?.full_name || 'Resident'}</span>
+                      <span className="text-[10px] text-primary uppercase tracking-[0.2em] font-black mt-0.5">Active Admin</span>
                     </div>
                   </div>
                   <button 
                     onClick={handleLogout}
-                    className="flex items-center justify-center gap-2 w-full p-4 bg-red-500/10 text-red-500 rounded-2xl font-bold active:scale-95 transition-all"
+                    className="flex items-center justify-center gap-2 w-full p-3.5 bg-red-500/10 hover:bg-red-500/20 text-red-500 rounded-xl font-bold transition-all text-xs uppercase tracking-widest active:scale-95"
                   >
-                    <LogOut size={20} />
+                    <LogOut size={16} />
                     Sign Out
                   </button>
                 </div>
-              </div>
+              </motion.div>
             </motion.div>
           )}
         </AnimatePresence>
