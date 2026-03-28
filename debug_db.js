@@ -1,23 +1,48 @@
 import { createClient } from '@supabase/supabase-js';
-import dotenv from 'dotenv';
-dotenv.config();
 
-const supabaseUrl = process.env.VITE_SUPABASE_URL;
-const supabaseKey = process.env.VITE_SUPABASE_ANON_KEY;
-const supabase = createClient(supabaseUrl, supabaseKey);
+const supabaseUrl = process.env.VITE_SUPABASE_URL || 'https://xnkiaonhptgajqfndfqt.supabase.co'; // Using project URL from logs
+const supabaseKey = process.env.VITE_SUPABASE_ANON_KEY; // This would need to be passed
 
-async function check() {
-  console.log('--- PROFILES ---');
-  const { data: profiles } = await supabase.from('profiles').select('*');
-  console.table(profiles?.map(p => ({ id: p.id, email: p.email, role: p.role, apt: p.apartment_id })));
-
-  console.log('--- APARTMENTS ---');
-  const { data: apts } = await supabase.from('apartments').select('*');
-  console.table(apts?.map(a => ({ id: a.id, name: a.name })));
-
-  console.log('--- APARTMENT MEMBERS ---');
-  const { data: members } = await supabase.from('apartment_members').select('*');
-  console.table(members?.map(m => ({ prof: m.profile_id, apt: m.apartment_id, role: m.role })));
+if (!supabaseUrl) {
+  console.error("Missing Supabase URL");
+  process.exit(1);
 }
 
-check();
+const supabase = createClient(supabaseUrl, supabaseKey);
+
+async function debugUser() {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) {
+    console.log("No user session found in context.");
+    return;
+  }
+
+  console.log("Logged In User:", user.email);
+  
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('*')
+    .eq('id', user.id)
+    .single();
+  
+  console.log("Profile Data:", profile);
+
+  const { data: memberships } = await supabase
+    .from('apartment_members')
+    .select('profile_id, apartment_id, role, apartments(name)')
+    .eq('profile_id', user.id);
+  
+  console.log("Memberships:", memberships);
+
+  if (profile?.apartment_id) {
+      const { data: residents } = await supabase
+        .from('profiles')
+        .select('full_name, email, role')
+        .eq('apartment_id', profile.apartment_id);
+      
+      console.log("Residents in same apartment:", residents?.length || 0);
+      residents?.forEach(r => console.log(` - ${r.full_name} (${r.role})`));
+  }
+}
+
+debugUser();

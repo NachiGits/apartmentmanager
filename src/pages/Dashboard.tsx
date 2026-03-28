@@ -57,6 +57,8 @@ export const Dashboard = () => {
   const [editingAptId, setEditingAptId]   = useState<string | null>(null);
   const [newAptName, setNewAptName]       = useState('');
   const [newAptAddress, setNewAptAddress] = useState('');
+  const [newAptCalcType, setNewAptCalcType] = useState<'EQUAL' | 'SQFT'>('EQUAL');
+  const [newAptCalcBasis, setNewAptCalcBasis] = useState<'BUILD_UP' | 'CARPET' | 'UDS'>('BUILD_UP');
   const [creating, setCreating]           = useState(false);
 
   const [apartments, setApartments] = useState<any[]>([]);
@@ -255,14 +257,25 @@ export const Dashboard = () => {
         // Update mode
         const { error } = await supabase
           .from('apartments')
-          .update({ name: newAptName, address: newAptAddress })
+          .update({ 
+            name: newAptName, 
+            address: newAptAddress,
+            calc_type: newAptCalcType,
+            calc_basis: newAptCalcType === 'SQFT' ? newAptCalcBasis : 'EQUAL' 
+          })
           .eq('id', editingAptId);
         if (error) throw error;
       } else {
         // Create mode
         const { data: apt, error } = await supabase
           .from('apartments')
-          .insert({ name: newAptName, address: newAptAddress, created_by: user?.id })
+          .insert({ 
+            name: newAptName, 
+            address: newAptAddress, 
+            calc_type: newAptCalcType,
+            calc_basis: newAptCalcType === 'SQFT' ? newAptCalcBasis : 'EQUAL',
+            created_by: user?.id 
+          })
           .select()
           .single();
         if (error) throw error;
@@ -279,6 +292,8 @@ export const Dashboard = () => {
       setEditingAptId(null);
       setNewAptName('');
       setNewAptAddress('');
+      setNewAptCalcType('EQUAL');
+      setNewAptCalcBasis('BUILD_UP');
       fetchDashboardData();
     } catch (err: any) {
       alert('Operation failed: ' + err.message);
@@ -400,7 +415,13 @@ export const Dashboard = () => {
                           </div>
                           <div>
                              <p className="text-xl font-black text-surface-900 dark:text-white leading-tight">{apt.name}</p>
-                             <p className="text-xs text-surface-500 font-bold uppercase tracking-wide mt-1">{apt.address}</p>
+                             <div className="flex items-center gap-2 mt-1">
+                               <p className="text-xs text-surface-500 font-bold uppercase tracking-wide">{apt.address}</p>
+                               <span className="w-1 h-1 rounded-full bg-surface-300"></span>
+                               <span className={`text-[9px] font-black px-2 py-0.5 rounded-md uppercase tracking-widest ${apt.calc_type === 'SQFT' ? 'bg-amber-100 text-amber-700 dark:bg-amber-500/10 dark:text-amber-400' : 'bg-blue-100 text-blue-700 dark:bg-blue-500/10 dark:text-blue-400'}`}>
+                                 {apt.calc_type === 'SQFT' ? `${apt.calc_basis?.replace('_', ' ') || 'Sqft'} Based` : 'Individual Based'}
+                               </span>
+                             </div>
                              {aptMemberCounts[apt.id] && (
                                <div className="flex gap-4 mt-3">
                                  <div className="flex items-center gap-1.5">
@@ -429,11 +450,24 @@ export const Dashboard = () => {
                                   setEditingAptId(apt.id);
                                   setNewAptName(apt.name);
                                   setNewAptAddress(apt.address);
+                                  setNewAptCalcType(apt.calc_type || 'EQUAL');
+                                  setNewAptCalcBasis(apt.calc_basis || 'BUILD_UP');
                                   setShowCreateApt(true);
                                 }}
                                 className="px-4 py-3 bg-white dark:bg-white/10 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-primary hover:text-white transition-all shadow-sm border border-black/5 whitespace-nowrap"
                               >
                                  Modify
+                              </button>
+                              <button 
+                                onClick={async () => {
+                                  if (!confirm(`Are you sure you want to delete ${apt.name}? All data (residents, alerts, expenses) will be permanently lost.`)) return;
+                                  const { error } = await supabase.from('apartments').delete().eq('id', apt.id);
+                                  if (error) alert(error.message);
+                                  else fetchDashboardData();
+                                }}
+                                className="px-4 py-3 bg-red-500/10 text-red-500 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-red-500 hover:text-white transition-all shadow-sm border border-red-500/20 whitespace-nowrap"
+                              >
+                                 Delete
                               </button>
                             </>
                           ) : (
@@ -454,6 +488,7 @@ export const Dashboard = () => {
                         setEditingAptId(null);
                         setNewAptName('');
                         setNewAptAddress('');
+                        setNewAptCalcType('EQUAL');
                         setShowCreateApt(true);
                       }}
                       className="w-full p-8 border-2 border-dashed border-surface-200 dark:border-white/10 rounded-[2rem] text-surface-400 font-black text-[10px] uppercase tracking-widest hover:border-primary hover:text-primary transition-all flex items-center justify-center gap-3 group"
@@ -740,6 +775,48 @@ export const Dashboard = () => {
                     />
                   </div>
                 </div>
+                <div className="space-y-3">
+                  <label className="text-[10px] font-black uppercase tracking-widest ml-1 text-surface-400">Maintenance Sharing Strategy</label>
+                  <div className="grid grid-cols-2 gap-3">
+                    <button
+                      type="button"
+                      onClick={() => setNewAptCalcType('EQUAL')}
+                      className={`p-4 rounded-2xl border transition-all text-left group ${newAptCalcType === 'EQUAL' ? 'border-primary bg-primary/5 ring-2 ring-primary/20' : 'border-black/5 dark:border-white/5 hover:border-primary/30'}`}
+                    >
+                      <p className={`text-xs font-black uppercase tracking-widest ${newAptCalcType === 'EQUAL' ? 'text-primary' : 'text-surface-500'}`}>Individual</p>
+                      <p className="text-[10px] text-surface-400 mt-1 font-medium leading-tight">Expenses divided equally among all units.</p>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setNewAptCalcType('SQFT')}
+                      className={`p-4 rounded-2xl border transition-all text-left group ${newAptCalcType === 'SQFT' ? 'border-amber-500 bg-amber-500/5 ring-2 ring-amber-500/20' : 'border-black/5 dark:border-white/5 hover:border-amber-500/30'}`}
+                    >
+                      <p className={`text-xs font-black uppercase tracking-widest ${newAptCalcType === 'SQFT' ? 'text-amber-500' : 'text-surface-500'}`}>Sqft Based</p>
+                      <p className="text-[10px] text-surface-400 mt-1 font-medium leading-tight">Shared based on unit area (price per sqft).</p>
+                    </button>
+                  </div>
+                </div>
+
+                {newAptCalcType === 'SQFT' && (
+                  <div className="space-y-3 animate-in slide-in-from-top-2 duration-300">
+                    <label className="text-[10px] font-black uppercase tracking-widest ml-1 text-surface-400">Measurement Type (Calculation Basis)</label>
+                    <div className="grid grid-cols-3 gap-2">
+                       {['BUILD_UP', 'CARPET', 'UDS'].map((basis) => (
+                         <button
+                           key={basis}
+                           type="button"
+                           onClick={() => setNewAptCalcBasis(basis as any)}
+                           className={`p-3 rounded-xl border text-[10px] font-black uppercase tracking-widest transition-all ${newAptCalcBasis === basis ? 'border-amber-500 bg-amber-500/10 text-amber-600 shadow-lg shadow-amber-500/10' : 'border-black/5 dark:border-white/5 text-surface-400 hover:border-amber-500/30'}`}
+                         >
+                           {basis.replace('_', ' ')}
+                         </button>
+                       ))}
+                    </div>
+                    <p className="text-[10px] text-surface-400 font-medium px-1 flex items-center gap-1.5 mt-2">
+                      <Clock size={12} className="text-amber-500" /> Maintenance will be: (Unit Area / Total Portfolio Area) × Expenses.
+                    </p>
+                  </div>
+                )}
 
                 <div className="pt-4 flex gap-4">
                   <button 

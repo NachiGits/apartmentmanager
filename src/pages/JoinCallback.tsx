@@ -13,7 +13,7 @@ import { motion } from 'framer-motion';
 
 type Step = 'loading' | 'success' | 'error';
 
-export const JoinCallback = () => {
+export const JoinCallback = ({ onComplete }: { onComplete?: () => void }) => {
   const navigate  = useNavigate();
   const [step, setStep]       = useState<Step>('loading');
   const [message, setMessage] = useState('Completing your registration...');
@@ -36,6 +36,7 @@ export const JoinCallback = () => {
 
       if (!token || !apartmentId) {
         // No pending invite — just redirect to dashboard normally
+        if (onComplete) onComplete();
         navigate('/', { replace: true });
         return;
       }
@@ -54,8 +55,14 @@ export const JoinCallback = () => {
         throw new Error('Invite is invalid or has already been used.');
       }
 
-      if (new Date(invite.expires_at) < new Date()) {
+      if (invite.expires_at && new Date(invite.expires_at) < new Date()) {
         throw new Error('This invite link has expired.');
+      }
+
+      // 3.5 STRICT EMAIL VERIFICATION
+      // If the admin specified an email in the invitation, we ENSURE it matches the sign-in
+      if (invite.email && invite.email.toLowerCase().trim() !== user.email?.toLowerCase().trim()) {
+        throw new Error(`This invite was sent to ${invite.email}. Please sign in with that Gmail account to join.`);
       }
 
       // 4. Update user profile with apartment_id and role
@@ -75,8 +82,12 @@ export const JoinCallback = () => {
           full_name:    user.user_metadata?.full_name || user.email?.split('@')[0],
           avatar_url:   user.user_metadata?.avatar_url,
           apartment_id: apartmentId,
-          unit_number:  invite.unit_number || null,
-          role:         userRole, // Use valid role from profiles enum
+          unit_number:  invite.unit_number || unitNumber || null,
+          sqft_build_up: invite.sqft_build_up || 0,
+          sqft_carpet:   invite.sqft_carpet   || 0,
+          sqft_uds:      invite.sqft_uds      || 0,
+          occupancy_type: invite.occupancy_type || 'OWNER',
+          role:         userRole,
           updated_at:   new Date().toISOString(),
         });
 
@@ -113,7 +124,7 @@ export const JoinCallback = () => {
       setStep('success');
       setMessage('Welcome to your community!');
 
-      // App state will be re-set to 'ready' by App.tsx when it detects the setup is done
+      if (onComplete) onComplete();
       setTimeout(() => navigate('/', { replace: true }), 1000);
 
     } catch (err: any) {
@@ -138,7 +149,16 @@ export const JoinCallback = () => {
           <>
             <div className="w-20 h-20 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin mx-auto mb-6" />
             <p className="text-white font-bold text-xl">{message}</p>
-            <p className="text-slate-400 text-sm mt-2">Please wait a moment...</p>
+            <p className="text-slate-400 text-sm mt-2 mb-8">Please wait a moment...</p>
+            <button
+              onClick={async () => {
+                await supabase.auth.signOut();
+                navigate('/login', { replace: true });
+              }}
+              className="text-slate-500 hover:text-white transition-colors text-xs font-bold uppercase tracking-widest"
+            >
+              Cancel or Stuck? Sign Out
+            </button>
           </>
         )}
 

@@ -11,6 +11,8 @@ import {
   AlertCircle,
   MapPin,
   Home,
+  Maximize2,
+  ShieldCheck,
 } from 'lucide-react';
 
 type InviteStatus = 'idle' | 'loading' | 'valid' | 'invalid' | 'expired' | 'accepted' | 'joining';
@@ -74,15 +76,30 @@ export const JoinApartment = () => {
     localStorage.setItem('pendingInviteToken', invite.token);
     localStorage.setItem('pendingApartmentId', invite.apartment_id);
     if (invite.unit_number) localStorage.setItem('pendingUnitNumber', invite.unit_number);
+    if (invite.sqft_build_up) localStorage.setItem('pendingSqftBuildUp', invite.sqft_build_up.toString());
+    if (invite.sqft_carpet) localStorage.setItem('pendingSqftCarpet', invite.sqft_carpet.toString());
+    if (invite.sqft_uds) localStorage.setItem('pendingSqftUDS', invite.sqft_uds.toString());
+    if (invite.occupancy_type) localStorage.setItem('pendingOccupancyType', invite.occupancy_type);
+
+    const oauthOptions: any = {
+      redirectTo: window.location.origin + '/join/callback'
+    };
+
+    // If the admin specified a target email, suggest it to Google
+    if (invite.email) {
+      oauthOptions.queryParams = {
+        prompt: 'select_account',
+        login_hint: invite.email
+      };
+    } else {
+      oauthOptions.queryParams = {
+        prompt: 'select_account'
+      };
+    }
 
     const { error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
-      options: {
-        redirectTo: window.location.origin + '/join/callback',
-        queryParams: {
-          prompt: 'select_account'
-        }
-      },
+      options: oauthOptions,
     });
 
     if (error) {
@@ -221,6 +238,34 @@ export const JoinApartment = () => {
                       </div>
                     </div>
                   )}
+                  <div className="pt-2 border-t border-white/5 space-y-3">
+                    <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest flex items-center gap-2">
+                       <Maximize2 size={12} /> Unit Dimensions (SQFT)
+                    </p>
+                    <div className="grid grid-cols-3 gap-2">
+                       <div className="bg-white/5 p-2 rounded-xl border border-white/5 text-center">
+                          <p className="text-[8px] text-slate-500 font-bold uppercase mb-0.5">Build-up</p>
+                          <p className="text-xs text-white font-black">{invite.sqft_build_up || '-'}</p>
+                       </div>
+                       <div className="bg-white/5 p-2 rounded-xl border border-white/5 text-center">
+                          <p className="text-[8px] text-slate-500 font-bold uppercase mb-0.5">Carpet</p>
+                          <p className="text-xs text-white font-black">{invite.sqft_carpet || '-'}</p>
+                       </div>
+                       <div className="bg-white/5 p-2 rounded-xl border border-white/5 text-center">
+                          <p className="text-[8px] text-slate-500 font-bold uppercase mb-0.5">UDS</p>
+                          <p className="text-xs text-white font-black">{invite.sqft_uds || '-'}</p>
+                       </div>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <div className="p-2 bg-blue-500/10 rounded-lg">
+                      <ShieldCheck size={18} className="text-blue-400" />
+                    </div>
+                    <div>
+                      <p className="text-xs text-slate-500 font-bold uppercase tracking-widest">Occupancy</p>
+                      <p className="text-white font-bold capitalize">{invite.occupancy_type || 'OWNER'}</p>
+                    </div>
+                  </div>
                   <div className="pt-2 border-t border-white/5">
                     <p className="text-xs text-slate-500">
                       Invite expires: <span className="text-slate-400 font-medium">

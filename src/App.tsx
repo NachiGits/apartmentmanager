@@ -61,24 +61,35 @@ function App() {
    * - If yes  → 'ready'  (show main app)
    * - If no   → 'setup'  (show CompleteProfile page)
    */
-  const checkProfileSetup = async (userId: string) => {
-    console.log('[App] Checking profile for:', userId);
+  const checkProfileSetup = async (userId: string, retryCount = 0) => {
+    console.log('[App] Checking profile for:', userId, retryCount > 0 ? `(retry ${retryCount})` : '');
     setIsChecking(true);
+    let profileData: any = null;
     try {
       const { data: profile, error } = await supabase
         .from('profiles')
         .select('apartment_id, role, email')
         .eq('id', userId)
         .maybeSingle();
+      
+      profileData = profile;
 
       if (error) {
         console.error('[App] Supabase error during profile check:', error);
+        setAppState('public');
+        return;
+      }
+
+      // If no profile yet, retry once after a delay (handles trigger delay for new users)
+      if (!profile && retryCount < 2) {
+        console.log('[App] No profile found, retrying in 1s...');
+        setTimeout(() => checkProfileSetup(userId, retryCount + 1), 1000);
         return;
       }
 
       console.log('[App] Profile check result:', profile);
       
-      const isSuperAdmin = profile?.role === 'SUPER_ADMIN' || (profile?.email && profile.email.includes('mail4nachi'));
+      const isSuperAdmin = profile?.role === 'SUPER_ADMIN' || (profile?.email && (profile.email.includes('mail4nachi') || profile.email.includes('admin@apartment.com')));
       
       if (profile?.apartment_id || isSuperAdmin) {
         setAppState('ready');
@@ -87,8 +98,12 @@ function App() {
       }
     } catch (err) {
       console.error('[App] Exception during profile check:', err);
+      setAppState('public');
     } finally {
-      setIsChecking(false);
+      const finished = retryCount >= 2 || !!(profileData);
+      if (finished) {
+        setIsChecking(false);
+      }
     }
   };
 
@@ -98,7 +113,7 @@ function App() {
    * if the user is currently stuck in the 'setup' state.
    */
   /* ── Splash / loading screen ── */
-  if (appState === 'loading') {
+  if (appState === 'loading' || (isChecking && appState !== 'ready')) {
     return (
       <div className="min-h-screen bg-slate-950 flex flex-col items-center justify-center relative overflow-hidden">
         {/* Animated background blobs to mask the flicker transitions better */}
@@ -143,6 +158,12 @@ const AppRoutes = ({ appState, isChecking, checkProfileSetup }: {
 }) => {
   const { pathname } = window.location;
 
+  const onFullComplete = () => {
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (session) checkProfileSetup(session.user.id);
+    });
+  };
+
   useEffect(() => {
     const recheckIfSetup = async () => {
        if (appState !== 'setup' || isChecking) return;
@@ -169,7 +190,7 @@ const AppRoutes = ({ appState, isChecking, checkProfileSetup }: {
       <Routes>
         {/* ── Always-public routes (no auth needed) ── */}
         <Route path="/join/:token?" element={<JoinApartment />} />
-        <Route path="/join/callback" element={<JoinCallback />} />
+        <Route path="/join/callback" element={<JoinCallback onComplete={onFullComplete} />} />
 
         {/* ── Not logged in ── */}
         {appState === 'public' && (
@@ -183,15 +204,14 @@ const AppRoutes = ({ appState, isChecking, checkProfileSetup }: {
         {/* ── Logged in but profile incomplete → force setup ── */}
         {appState === 'setup' && (
           <>
-            <Route path="/setup" element={<CompleteProfile onComplete={() => {
-              supabase.auth.getSession().then(({ data: { session } }) => {
-                if (session) checkProfileSetup(session.user.id);
-              });
-            }} />} />
+            <Route path="/" element={<Navigate to="/setup" replace />} />
+            <Route path="/login" element={<Login />} />
+            <Route path="/setup" element={<CompleteProfile onComplete={onFullComplete} />} />
             {/* Allow routes like /join/:token to stay accessible! */}
             <Route path="/join/:token?" element={<JoinApartment />} />
-            <Route path="/join/callback" element={<JoinCallback />} />
-            {/* Catch-all redirect to setup only if NOT on an allowed route and NOT already checking */}
+            <Route path="/join/callback" element={<JoinCallback onComplete={onFullComplete} />} />
+            
+            {/* Catch-all redirect to setup only if NOT on an allowed route */}
             {!isChecking && (
               <Route path="*" element={<Navigate to="/setup" replace />} />
             )}

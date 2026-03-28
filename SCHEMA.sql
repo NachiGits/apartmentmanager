@@ -1,5 +1,5 @@
 -- APARTMENT MANAGEMENT SYSTEM SCHEMA (SUPABASE POSTGRES)
--- Updated with "IF NOT EXISTS" for robustness
+-- Updated with "IF NOT EXISTS" for robustness and synchronized with app logic
 
 -- 1. TABLES
 CREATE TABLE IF NOT EXISTS apartments (
@@ -7,28 +7,20 @@ CREATE TABLE IF NOT EXISTS apartments (
   name text NOT NULL,
   address text,
   calc_type text DEFAULT 'EQUAL' CHECK (calc_type IN ('SQFT', 'EQUAL')),
+  calc_basis text DEFAULT 'EQUAL' CHECK (calc_basis IN ('BUILD_UP', 'CARPET', 'UDS', 'EQUAL')),
   created_by uuid REFERENCES auth.users(id),
   created_at timestamp with time zone DEFAULT timezone('utc'::text, now()) NOT NULL
 );
+
+-- Ensure missing columns exist in apartments
+ALTER TABLE apartments ADD COLUMN IF NOT EXISTS address text;
+ALTER TABLE apartments ADD COLUMN IF NOT EXISTS calc_type text DEFAULT 'EQUAL' CHECK (calc_type IN ('SQFT', 'EQUAL'));
+ALTER TABLE apartments ADD COLUMN IF NOT EXISTS calc_basis text DEFAULT 'EQUAL' CHECK (calc_basis IN ('BUILD_UP', 'CARPET', 'UDS', 'EQUAL'));
 
 -- Ensure created_by exists with proper deletion behavior
 ALTER TABLE apartments DROP CONSTRAINT IF EXISTS apartments_created_by_fkey;
 ALTER TABLE apartments ADD CONSTRAINT apartments_created_by_fkey 
   FOREIGN KEY (created_by) REFERENCES auth.users(id) ON DELETE SET NULL;
-
-CREATE TABLE IF NOT EXISTS apartment_members (
-  profile_id uuid REFERENCES profiles(id) ON DELETE CASCADE,
-  apartment_id uuid REFERENCES apartments(id) ON DELETE CASCADE,
-  role text DEFAULT 'MEMBER' CHECK (role IN ('ADMIN', 'MEMBER')),
-  joined_at timestamp with time zone DEFAULT timezone('utc'::text, now()),
-  PRIMARY KEY (profile_id, apartment_id)
-);
-
-ALTER TABLE apartment_members ENABLE ROW LEVEL SECURITY;
-
--- Ensure missing columns exist in apartments
-ALTER TABLE apartments ADD COLUMN IF NOT EXISTS address text;
-ALTER TABLE apartments ADD COLUMN IF NOT EXISTS calc_type text DEFAULT 'EQUAL' CHECK (calc_type IN ('SQFT', 'EQUAL'));
 
 CREATE TABLE IF NOT EXISTS profiles (
   id uuid REFERENCES auth.users ON DELETE CASCADE PRIMARY KEY,
@@ -38,17 +30,33 @@ CREATE TABLE IF NOT EXISTS profiles (
   role text DEFAULT 'RESIDENT' CHECK (role IN ('ADMIN', 'RESIDENT', 'MEMBER', 'SUPER_ADMIN')),
   apartment_id uuid REFERENCES apartments(id),
   unit_number text,
+  occupancy_type text DEFAULT 'OWNER' CHECK (occupancy_type IN ('OWNER', 'TENANT')),
+  sqft_build_up numeric DEFAULT 0,
+  sqft_carpet numeric DEFAULT 0,
+  sqft_uds numeric DEFAULT 0,
   updated_at timestamp with time zone DEFAULT timezone('utc'::text, now())
 );
 
 -- Ensure missing columns exist in profiles
 ALTER TABLE profiles ADD COLUMN IF NOT EXISTS email text;
 ALTER TABLE profiles ADD COLUMN IF NOT EXISTS unit_number text;
+ALTER TABLE profiles ADD COLUMN IF NOT EXISTS occupancy_type text DEFAULT 'OWNER' CHECK (occupancy_type IN ('OWNER', 'TENANT'));
+ALTER TABLE profiles ADD COLUMN IF NOT EXISTS sqft_build_up numeric DEFAULT 0;
+ALTER TABLE profiles ADD COLUMN IF NOT EXISTS sqft_carpet numeric DEFAULT 0;
+ALTER TABLE profiles ADD COLUMN IF NOT EXISTS sqft_uds numeric DEFAULT 0;
 
 -- Update role constraint safely
 ALTER TABLE profiles DROP CONSTRAINT IF EXISTS profiles_role_check;
 ALTER TABLE profiles ADD CONSTRAINT profiles_role_check 
   CHECK (role IN ('ADMIN', 'RESIDENT', 'MEMBER', 'SUPER_ADMIN'));
+
+CREATE TABLE IF NOT EXISTS apartment_members (
+  profile_id uuid REFERENCES profiles(id) ON DELETE CASCADE,
+  apartment_id uuid REFERENCES apartments(id) ON DELETE CASCADE,
+  role text DEFAULT 'MEMBER' CHECK (role IN ('ADMIN', 'MEMBER')),
+  joined_at timestamp with time zone DEFAULT timezone('utc'::text, now()),
+  PRIMARY KEY (profile_id, apartment_id)
+);
 
 CREATE TABLE IF NOT EXISTS resident_units (
   id uuid DEFAULT gen_random_uuid() PRIMARY KEY,
@@ -106,6 +114,10 @@ CREATE TABLE IF NOT EXISTS invitations (
   apartment_id uuid REFERENCES apartments(id) ON DELETE CASCADE,
   email text,
   unit_number text,
+  occupancy_type text DEFAULT 'OWNER' CHECK (occupancy_type IN ('OWNER', 'TENANT')),
+  sqft_build_up numeric DEFAULT 0,
+  sqft_carpet numeric DEFAULT 0,
+  sqft_uds numeric DEFAULT 0,
   invited_by uuid REFERENCES profiles(id) ON DELETE SET NULL,
   token uuid DEFAULT gen_random_uuid() UNIQUE NOT NULL,
   status text DEFAULT 'PENDING' CHECK (status IN ('PENDING', 'ACCEPTED', 'EXPIRED')),
@@ -113,9 +125,16 @@ CREATE TABLE IF NOT EXISTS invitations (
   created_at timestamp with time zone DEFAULT timezone('utc'::text, now())
 );
 
+-- Ensure missing columns exist in invitations
+ALTER TABLE invitations ADD COLUMN IF NOT EXISTS occupancy_type text DEFAULT 'OWNER' CHECK (occupancy_type IN ('OWNER', 'TENANT'));
+ALTER TABLE invitations ADD COLUMN IF NOT EXISTS sqft_build_up numeric DEFAULT 0;
+ALTER TABLE invitations ADD COLUMN IF NOT EXISTS sqft_carpet numeric DEFAULT 0;
+ALTER TABLE invitations ADD COLUMN IF NOT EXISTS sqft_uds numeric DEFAULT 0;
+
 -- 2. ENABLE RLS (Safe to run multiple times)
 ALTER TABLE apartments ENABLE ROW LEVEL SECURITY;
 ALTER TABLE profiles ENABLE ROW LEVEL SECURITY;
+ALTER TABLE apartment_members ENABLE ROW LEVEL SECURITY;
 ALTER TABLE resident_units ENABLE ROW LEVEL SECURITY;
 ALTER TABLE expenses ENABLE ROW LEVEL SECURITY;
 ALTER TABLE charges ENABLE ROW LEVEL SECURITY;
@@ -149,7 +168,26 @@ BEGIN
 END;
 $$;
 
+-- FIX: can_view_profile should query apartment_members to avoid infinite recursion on profiles
+CREATE OR REPLACE FUNCTION can_view_profile(target_profile_id uuid)
+RETURNS boolean
+LANGUAGE plpgsql SECURITY DEFINER
+AS $$
+BEGIN
+  -- Check if they share any apartment membership
+  RETURN EXISTS (
+    SELECT 1
+    FROM apartment_members am1
+    JOIN apartment_members am2 ON am1.apartment_id = am2.apartment_id
+    WHERE am1.profile_id = target_profile_id
+      AND am2.profile_id = auth.uid()
+  );
+END;
+$$;
+
 -- 4. POLICIES (DROP and RECREATE to skip if they already exist gracefully)
+
+-- Apartment Members Policies
 DROP POLICY IF EXISTS "Members can view their own membership" ON apartment_members;
 CREATE POLICY "Members can view their own membership" ON apartment_members FOR SELECT
   USING (
@@ -164,9 +202,6 @@ CREATE POLICY "Apartment members can view other members" ON apartment_members FO
     (auth.jwt() ->> 'email' = 'mail4nachi@gmail.com')
   );
 
-DROP POLICY IF EXISTS "Apartment public access" ON apartments;
-CREATE POLICY "Apartment public access" ON apartments FOR SELECT USING (true);
-
 DROP POLICY IF EXISTS "Users can manage their own memberships" ON apartment_members;
 CREATE POLICY "Users can manage their own memberships" ON apartment_members FOR ALL
   USING (profile_id = auth.uid())
@@ -178,6 +213,15 @@ CREATE POLICY "Admins can update member roles" ON apartment_members FOR ALL
     (auth.jwt() ->> 'email' = 'mail4nachi@gmail.com') OR
     is_admin_of(apartment_id)
   );
+
+
+-- Apartment Policies
+DROP POLICY IF EXISTS "Apartment public access" ON apartments;
+CREATE POLICY "Apartment public access" ON apartments FOR SELECT USING (true);
+
+DROP POLICY IF EXISTS "Authenticated users can create apartments" ON apartments;
+CREATE POLICY "Authenticated users can create apartments" ON apartments FOR INSERT 
+  WITH CHECK (auth.uid() IS NOT NULL);
 
 DROP POLICY IF EXISTS "Admins can update their apartment" ON apartments;
 CREATE POLICY "Admins can update their apartment" ON apartments FOR UPDATE 
@@ -198,11 +242,13 @@ CREATE POLICY "Users can view apartments they belong to" ON apartments FOR SELEC
     (auth.jwt() ->> 'email' = 'mail4nachi@gmail.com')
   );
 
+
+-- Profile Policies
 DROP POLICY IF EXISTS "Profiles are viewable by apartment members" ON profiles;
 CREATE POLICY "Profiles are viewable by apartment members" ON profiles FOR SELECT
   USING (
     id = auth.uid() OR 
-    apartment_id IN (SELECT get_my_apartments()) OR 
+    can_view_profile(id) OR 
     (auth.jwt() ->> 'email' = 'mail4nachi@gmail.com')
   );
 
@@ -219,6 +265,8 @@ CREATE POLICY "Admins can update residents in their apartment" ON profiles FOR U
 DROP POLICY IF EXISTS "Users can create their own profile" ON profiles;
 CREATE POLICY "Users can create their own profile" ON profiles FOR INSERT WITH CHECK (id = auth.uid());
 
+
+-- Other Tables
 DROP POLICY IF EXISTS "Units are viewable by apartment members" ON resident_units;
 CREATE POLICY "Units are viewable by apartment members" ON resident_units FOR SELECT
   USING (apartment_id IN (SELECT get_my_apartments()));
@@ -245,14 +293,20 @@ CREATE POLICY "Complaints are viewable by apartment members" ON complaints FOR S
 DROP POLICY IF EXISTS "Users can create complaints" ON complaints;
 CREATE POLICY "Users can create complaints" ON complaints FOR INSERT WITH CHECK (profile_id = auth.uid());
 
--- New policies for invitations
+
+-- Invitation Policies
 DROP POLICY IF EXISTS "Invitations are viewable by everyone" ON invitations;
 CREATE POLICY "Invitations are viewable by everyone" ON invitations FOR SELECT USING (true);
 
 DROP POLICY IF EXISTS "Authenticated users can update invitation status" ON invitations;
 CREATE POLICY "Authenticated users can update invitation status" ON invitations FOR UPDATE USING (auth.uid() IS NOT NULL);
 
--- 4. TRIGGERS & FUNCTIONS
+DROP POLICY IF EXISTS "Admins can create invitations" ON invitations;
+CREATE POLICY "Admins can create invitations" ON invitations FOR INSERT 
+  WITH CHECK (is_admin_of(apartment_id) OR (auth.jwt() ->> 'email' = 'mail4nachi@gmail.com'));
+
+
+-- 5. TRIGGERS & FUNCTIONS
 CREATE OR REPLACE FUNCTION public.handle_new_user()
 RETURNS trigger AS $$
 BEGIN
