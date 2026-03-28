@@ -22,6 +22,8 @@ export const Layout = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [user, setUser] = useState<any>(null);
   const [userRole, setUserRole] = useState<string | null>(null);
+  const [notifications, setNotifications] = useState<any[]>([]);
+  const [showNotifs, setShowNotifs] = useState(false);
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -31,12 +33,36 @@ export const Layout = () => {
       if (user) {
         supabase.from('profiles').select('role').eq('id', user.id).single()
           .then(({ data }) => setUserRole(data?.role || 'RESIDENT'));
+        
+        fetchNotifications(user.id);
       }
     });
   }, []);
 
+  const fetchNotifications = async (userId: string) => {
+    const { data } = await supabase
+      .from('notifications')
+      .select('*')
+      .eq('profile_id', userId)
+      .eq('status', 'UNREAD')
+      .order('created_at', { ascending: false })
+      .limit(5);
+    setNotifications(data || []);
+  };
+
+  const markAllRead = async () => {
+    if (!user) return;
+    await supabase
+      .from('notifications')
+      .update({ status: 'READ' })
+      .eq('profile_id', user.id);
+    setNotifications([]);
+    setShowNotifs(false);
+  };
+
   const handleLogout = async () => {
     await supabase.auth.signOut();
+    import('react-hot-toast').then(({ toast }) => toast.success('Logged out successfully'));
     navigate('/login');
   };
 
@@ -99,14 +125,55 @@ export const Layout = () => {
                   <Search size={18} />
                 </button>
                 
-                <button className="p-2 rounded-xl bg-white dark:bg-white/5 border border-black/5 dark:border-white/5 shadow-sm hover:shadow-md transition-all relative active:scale-90 group">
-                  <Bell size={18} className="text-surface-400 group-hover:text-primary transition-colors" />
-                  <span className="absolute top-2 right-2 w-1.5 h-1.5 bg-primary rounded-full border border-white dark:border-slate-800"></span>
-                </button>
+                <div className="relative">
+                  <button 
+                    onClick={() => setShowNotifs(!showNotifs)}
+                    className="p-2 rounded-xl bg-white dark:bg-white/5 border border-black/5 dark:border-white/5 shadow-sm hover:shadow-md transition-all relative active:scale-90 group"
+                  >
+                    <Bell size={18} className="text-surface-400 group-hover:text-primary transition-colors" />
+                    {notifications.length > 0 && (
+                      <span className="absolute top-2 right-2 w-2 h-2 bg-red-500 rounded-full border border-white dark:border-slate-800 animate-pulse"></span>
+                    )}
+                  </button>
+
+                  <AnimatePresence>
+                    {showNotifs && (
+                      <motion.div 
+                        initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 10 }}
+                        className="absolute right-0 mt-3 w-80 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-[2rem] shadow-2xl overflow-hidden z-[100]"
+                      >
+                         <div className="p-5 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between">
+                            <span className="text-xs font-black uppercase tracking-widest text-slate-500">Notifications</span>
+                            {notifications.length > 0 && (
+                              <button onClick={markAllRead} className="text-[10px] font-black text-indigo-600 uppercase hover:underline">Clear All</button>
+                            )}
+                         </div>
+                         <div className="max-h-96 overflow-y-auto">
+                            {notifications.length === 0 ? (
+                              <div className="p-8 text-center text-slate-400 italic text-xs">No unread alerts</div>
+                            ) : (
+                              notifications.map(n => (
+                                <div key={n.id} className="p-4 border-b border-slate-50 dark:border-slate-800/50 hover:bg-slate-50 dark:hover:bg-white/5 transition-colors cursor-pointer">
+                                   <div className="flex gap-3">
+                                      <div className="h-2 w-2 bg-indigo-500 rounded-full shrink-0 mt-1.5"></div>
+                                      <div className="flex-1">
+                                         <p className="text-[11px] font-black leading-tight mb-0.5">{n.title}</p>
+                                         <p className="text-[10px] text-slate-500 leading-snug">{n.description}</p>
+                                         <span className="text-[8px] font-bold text-slate-400 mt-1 block uppercase">{new Date(n.created_at).toLocaleDateString()}</span>
+                                      </div>
+                                   </div>
+                                </div>
+                              ))
+                            )}
+                         </div>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+                </div>
 
                 <div className="h-6 w-px bg-black/5 dark:bg-white/5 mx-1"></div>
 
-                <div className="h-8 w-8 rounded-xl bg-gradient-premium flex items-center justify-center text-white font-black text-sm overflow-hidden shadow-lg shadow-emerald-500/20 border border-white dark:border-white/10 active:scale-95 transition-transform">
+                <div className="h-8 w-8 rounded-xl bg-gradient-premium flex items-center justify-center text-white font-black text-sm overflow-hidden shadow-lg shadow-emerald-500/20 border border-white dark:border-white/10 active:scale-95 transition-transform text-center pt-2">
                   {user?.user_metadata?.avatar_url ? (
                     <img src={user.user_metadata.avatar_url} alt="Profile" className="w-full h-full object-cover" />
                   ) : (
@@ -125,7 +192,7 @@ export const Layout = () => {
 
               {/* Mobile Profile & Menu Toggle */}
               <div className="lg:hidden flex items-center gap-2">
-                 <div className="h-9 w-9 rounded-xl bg-gradient-premium flex items-center justify-center text-white font-black text-sm overflow-hidden shadow-lg border border-white dark:border-white/10">
+                 <div className="h-9 w-9 rounded-xl bg-gradient-premium flex items-center justify-center text-white font-black text-sm overflow-hidden shadow-lg border border-white dark:border-white/10 pt-2 text-center">
                     {user?.user_metadata?.avatar_url ? (
                       <img src={user.user_metadata.avatar_url} alt="Profile" className="w-full h-full object-cover" />
                     ) : (
@@ -225,7 +292,7 @@ export const Layout = () => {
               <div className="p-6 md:p-8 border-t border-black/5 dark:border-white/5 bg-white dark:bg-black/20">
                 <div className="flex items-center justify-between mb-6">
                   <div className="flex items-center gap-3.5">
-                    <div className="h-12 w-12 rounded-2xl bg-gradient-premium flex items-center justify-center text-white font-black text-xl overflow-hidden shadow-xl shadow-emerald-500/20 divide-x-2 border-2 border-white dark:border-white/10">
+                    <div className="h-12 w-12 rounded-2xl bg-gradient-premium flex items-center justify-center text-white font-black text-xl overflow-hidden shadow-xl shadow-emerald-500/20 divide-x-2 border-2 border-white dark:border-white/10 pt-2 text-center">
                        {user?.user_metadata?.avatar_url ? (
                          <img src={user.user_metadata.avatar_url} alt="Profile" className="w-full h-full object-cover" />
                        ) : (
@@ -281,9 +348,6 @@ export const Layout = () => {
            <Outlet />
         </div>
       </main>
-
-      {/* Mobile Interaction - Optional: Bottom minimal bar if needed, but top is requested */}
     </div>
   );
 };
-

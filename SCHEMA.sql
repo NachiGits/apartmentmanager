@@ -133,13 +133,18 @@ CREATE TABLE IF NOT EXISTS invitations (
   created_at timestamp with time zone DEFAULT timezone('utc'::text, now())
 );
 
--- Ensure missing columns exist in invitations
-ALTER TABLE invitations ADD COLUMN IF NOT EXISTS occupancy_type text DEFAULT 'OWNER' CHECK (occupancy_type IN ('OWNER', 'TENANT'));
-ALTER TABLE invitations ADD COLUMN IF NOT EXISTS sqft_build_up numeric DEFAULT 0;
-ALTER TABLE invitations ADD COLUMN IF NOT EXISTS sqft_carpet numeric DEFAULT 0;
-ALTER TABLE invitations ADD COLUMN IF NOT EXISTS sqft_uds numeric DEFAULT 0;
+CREATE TABLE IF NOT EXISTS notifications (
+  id uuid DEFAULT gen_random_uuid() PRIMARY KEY,
+  apartment_id uuid REFERENCES apartments(id) ON DELETE CASCADE,
+  profile_id uuid REFERENCES profiles(id) ON DELETE CASCADE, -- Recipient
+  title text NOT NULL,
+  description text,
+  type text CHECK (type IN ('SQFT_REQUEST', 'COMPLAINT', 'GENERAL')),
+  status text DEFAULT 'UNREAD' CHECK (status IN ('UNREAD', 'READ')),
+  created_at timestamp with time zone DEFAULT timezone('utc'::text, now())
+);
 
--- 2. ENABLE RLS (Safe to run multiple times)
+-- 2. ENABLE RLS
 ALTER TABLE apartments ENABLE ROW LEVEL SECURITY;
 ALTER TABLE profiles ENABLE ROW LEVEL SECURITY;
 ALTER TABLE apartment_members ENABLE ROW LEVEL SECURITY;
@@ -149,6 +154,7 @@ ALTER TABLE charges ENABLE ROW LEVEL SECURITY;
 ALTER TABLE announcements ENABLE ROW LEVEL SECURITY;
 ALTER TABLE complaints ENABLE ROW LEVEL SECURITY;
 ALTER TABLE invitations ENABLE ROW LEVEL SECURITY;
+ALTER TABLE notifications ENABLE ROW LEVEL SECURITY;
 
 -- 3. HELPER FUNCTIONS
 CREATE OR REPLACE FUNCTION is_super_admin()
@@ -254,6 +260,11 @@ CREATE POLICY "Invitation view" ON invitations FOR SELECT USING (true);
 DROP POLICY IF EXISTS "Invitation manage" ON invitations;
 CREATE POLICY "Invitation manage" ON invitations FOR ALL
   USING (is_super_admin() OR is_admin_of(apartment_id));
+
+-- Notifications
+DROP POLICY IF EXISTS "Notification view" ON notifications;
+CREATE POLICY "Notification view" ON notifications FOR SELECT
+  USING (is_super_admin() OR profile_id = auth.uid());
 
 
 -- 5. TRIGGERS

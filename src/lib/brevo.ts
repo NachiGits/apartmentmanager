@@ -128,3 +128,54 @@ export async function sendInviteEmail({
     return { success: false, error: 'Network error while sending email.' };
   }
 }
+/**
+ * Sends an email to administrators when a resident requests a SQFT change.
+ */
+export async function sendSqftChangeEmail({
+  adminEmail,
+  residentName,
+  apartmentName,
+  unitNumber
+}: {
+  adminEmail: string;
+  residentName: string;
+  apartmentName: string;
+  unitNumber?: string;
+}): Promise<{ success: boolean; error?: string }> {
+  if (!BREVO_API_KEY) return { success: false, error: 'Not configured.' };
+
+  const htmlContent = `
+    <div style="font-family:sans-serif;max-width:500px;margin:20px auto;border-radius:16px;overflow:hidden;border:1px solid #e2e8f0;">
+      <div style="background:#4f46e5;padding:30px;text-align:center;color:white;">
+        <h2 style="margin:0;">SQFT Change Request</h2>
+      </div>
+      <div style="padding:30px;color:#334155;">
+        <p>Hi Admin,</p>
+        <p><strong>${residentName}</strong> from ${unitNumber ? `Unit <strong>${unitNumber}</strong> at ` : ''} <strong>${apartmentName}</strong> has submitted a request to update their apartment area measurements (SQFT).</p>
+        <p>This request requires your manual verification and approval before it affects the billing calculations.</p>
+        <div style="text-align:center;margin:30px 0;">
+          <a href="${window.location.origin}/residents" style="background:#4f46e5;color:white;padding:12px 24px;border-radius:8px;text-decoration:none;font-weight:bold;">Review Request →</a>
+        </div>
+      </div>
+    </div>
+  `;
+
+  try {
+    const response = await fetch(BREVO_API_URL, {
+      method: 'POST',
+      headers: {
+        'api-key': BREVO_API_KEY,
+        'content-type': 'application/json',
+      },
+      body: JSON.stringify({
+        sender: { name: SENDER_NAME, email: SENDER_EMAIL },
+        to: [{ email: adminEmail }],
+        subject: `[Request] SQFT Change for ${residentName} (${apartmentName})`,
+        htmlContent,
+      }),
+    });
+    return { success: response.ok };
+  } catch (err: any) {
+    return { success: false, error: err.message };
+  }
+}

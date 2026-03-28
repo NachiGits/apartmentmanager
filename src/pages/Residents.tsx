@@ -203,7 +203,7 @@ export const Residents = () => {
     try {
       if (!isAdmin && !isSelf) throw new Error('Unauthorized');
       if (!isAdmin && (editingResident.role === 'ADMIN' || editingResident.role === 'SUPER_ADMIN')) {
-        throw new Error('Members cannot change administrative data.');
+        throw new Error('Members cannot change administrative records.');
       }
 
       const updateData: any = {
@@ -232,6 +232,42 @@ export const Residents = () => {
         .eq('id', editingResident.id);
 
       if (error) throw error;
+
+      // === ADMINISTRATIVE NOTIFICATIONS ===
+      if (!isAdmin) {
+         // 1. Database Notification
+         const { data: admins } = await supabase
+            .from('apartment_members')
+            .select('profile_id')
+            .eq('apartment_id', editingResident.apartment_id)
+            .eq('role', 'ADMIN');
+         
+         if (admins && admins.length > 0) {
+            const notifs = admins.map(a => ({
+               apartment_id: editingResident.apartment_id,
+               profile_id: a.profile_id,
+               title: 'SQFT Change Request',
+               description: `${editingResident.full_name} from Unit ${editUnitNumber} has requested area updates.`,
+               type: 'SQFT_REQUEST'
+            }));
+            await supabase.from('notifications').insert(notifs);
+
+            // 2. Email Admin directly
+            const { data: adminProf } = await supabase.from('profiles').select('email').eq('id', admins[0].profile_id).single();
+            if (adminProf?.email) {
+               import('../lib/brevo').then(m => m.sendSqftChangeEmail({
+                  adminEmail: adminProf.email,
+                  residentName: editingResident.full_name,
+                  apartmentName: editingResident.apartment_name,
+                  unitNumber: editUnitNumber
+               }));
+            }
+         }
+         import('react-hot-toast').then(({ toast }) => toast.success('Request Submitted to Admin!'));
+      } else {
+         import('react-hot-toast').then(({ toast }) => toast.success('Record Updated Successfully!'));
+      }
+
       setShowEditModal(false);
       fetchResidents();
     } catch (err: any) {

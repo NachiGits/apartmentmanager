@@ -14,6 +14,7 @@ import { JoinApartment } from './pages/JoinApartment';
 import { JoinCallback } from './pages/JoinCallback';
 import { CompleteProfile } from './pages/CompleteProfile';
 import { AnimatePresence } from 'framer-motion';
+import { Toaster, toast } from 'react-hot-toast';
 
 type AppState = 'loading' | 'public' | 'setup' | 'ready';
 function App() {
@@ -56,10 +57,10 @@ function App() {
     };
   }, []);
 
+  const [hasNotifiedLogin, setHasNotifiedLogin] = useState(false);
+
   /**
    * Check if the logged-in user has completed their profile (i.e. linked to an apartment).
-   * - If yes  → 'ready'  (show main app)
-   * - If no   → 'setup'  (show CompleteProfile page)
    */
   const checkProfileSetup = async (userId: string, retryCount = 0) => {
     console.log('[App] Checking profile for:', userId, retryCount > 0 ? `(retry ${retryCount})` : '');
@@ -80,18 +81,18 @@ function App() {
         return;
       }
 
-      // If no profile yet, retry once after a delay (handles trigger delay for new users)
       if (!profile && retryCount < 2) {
-        console.log('[App] No profile found, retrying in 1s...');
         setTimeout(() => checkProfileSetup(userId, retryCount + 1), 1000);
         return;
       }
-
-      console.log('[App] Profile check result:', profile);
       
       const isSuperAdmin = profile?.role === 'SUPER_ADMIN' || (profile?.email && (profile.email.includes('mail4nachi') || profile.email.includes('admin@apartment.com')));
       
       if (profile?.apartment_id || isSuperAdmin) {
+        if (!hasNotifiedLogin) {
+          import('react-hot-toast').then(({ toast }) => toast.success('Login Successful!'));
+          setHasNotifiedLogin(true);
+        }
         setAppState('ready');
       } else {
         setAppState('setup');
@@ -138,6 +139,19 @@ function App() {
 
   return (
     <Router>
+      <Toaster 
+        position="top-right"
+        toastOptions={{
+          style: {
+            background: '#ffffff',
+            color: '#0f172a',
+            fontWeight: 'bold',
+            borderRadius: '16px',
+            border: '1px solid #e2e8f0',
+            boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05)',
+          },
+        }}
+      />
       <AppRoutes 
         appState={appState} 
         isChecking={isChecking}
