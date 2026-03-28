@@ -286,13 +286,13 @@ export const Dashboard = () => {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-10">
         {/* Manage Communities / Portfolio oversight */}
         <div className="lg:col-span-2 space-y-8">
-          <div className="glass p-10 bg-white dark:bg-white/5 border border-white/20 dark:border-white/10 shadow-xl min-h-[500px]">
-             <div className="flex items-center justify-between mb-10">
+          <div className="glass p-6 md:p-10 bg-white dark:bg-white/5 border border-white/20 dark:border-white/10 shadow-xl min-h-[500px]">
+             <div className="flex items-center justify-between mb-8 md:mb-10">
                 <h3 className="text-xl font-black flex items-center gap-4 text-surface-900 dark:text-white">
                   <div className="p-2 bg-indigo-500/10 rounded-xl text-indigo-500"><Building2 size={22} strokeWidth={2.5} /></div>
                   {(userRole === 'SUPER_ADMIN' || userRole === 'ADMIN') ? 'Portfolio Oversight' : 'Your Residence'}
                 </h3>
-                <span className="text-[10px] font-black text-surface-400 uppercase tracking-widest">
+                <span className="hidden sm:inline-block text-[10px] font-black text-surface-400 uppercase tracking-widest">
                   {userRole === 'SUPER_ADMIN' ? 'All Active Estates' : 'Managed Estates'}
                 </span>
               </div>
@@ -377,8 +377,8 @@ export const Dashboard = () => {
 
         {/* Community Broadcast UI */}
         <div className="space-y-8">
-          <div className="glass p-10 bg-white dark:bg-white/5 border border-white/20 dark:border-white/10 shadow-2xl min-h-[500px] flex flex-col">
-            <h3 className="text-xl font-black mb-10 flex items-center gap-4 text-surface-900 dark:text-white uppercase tracking-widest">
+          <div className="glass p-6 md:p-10 bg-white dark:bg-white/5 border border-white/20 dark:border-white/10 shadow-2xl min-h-[500px] flex flex-col">
+            <h3 className="text-xl font-black mb-8 md:mb-10 flex items-center gap-4 text-surface-900 dark:text-white uppercase tracking-widest">
               <CircleAlert size={28} className="text-primary" strokeWidth={2.5} />
               Community Alerts
             </h3>
