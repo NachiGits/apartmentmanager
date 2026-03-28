@@ -61,33 +61,52 @@ export const Layout = () => {
       <header className="sticky top-0 z-50 w-full">
         {/* Main Header */}
         <div className="glass mx-0 md:mx-4 mt-0 md:mt-4 border-b md:border border-white/20 dark:border-white/5 bg-white/70 dark:bg-slate-900/70 backdrop-blur-2xl shadow-xl transition-all duration-300">
-          <div className="max-w-7xl mx-auto w-full px-4 md:px-8 pt-3 md:pt-4 flex items-center justify-between">
+          <div className="max-w-7xl mx-auto w-full px-4 md:px-6 py-2.5 flex items-center justify-between gap-4">
             {/* Logo Section */}
-            <div className="flex items-center gap-3">
-              <div className="p-2 bg-gradient-premium rounded-xl text-white shadow-lg shadow-emerald-500/20 active:scale-95 transition-transform cursor-pointer" onClick={() => navigate('/')}>
-                <Building2 size={24} strokeWidth={2.5} />
+            <div className="flex items-center gap-2 shrink-0">
+              <div className="p-1.5 bg-gradient-premium rounded-xl text-white shadow-lg shadow-emerald-500/20 active:scale-95 transition-transform cursor-pointer" onClick={() => navigate('/')}>
+                <Building2 size={20} strokeWidth={2.5} />
               </div>
               <div className="flex flex-col">
-                <span className="font-extrabold text-lg md:text-xl tracking-tight text-gradient leading-none">HomeConnect</span>
-                <span className="text-[10px] font-bold text-surface-400 uppercase tracking-widest mt-1 hidden xs:block">Apartment Manager</span>
+                <span className="font-extrabold text-base md:text-lg tracking-tight text-gradient leading-none">HomeConnect</span>
+                <span className="text-[9px] font-bold text-surface-400 uppercase tracking-widest mt-0.5 hidden sm:block">Manager</span>
               </div>
             </div>
 
-            {/* Right Side Actions (Desktop) */}
-            <div className="flex items-center gap-2 md:gap-4">
-              <div className="hidden lg:flex items-center gap-2 md:gap-3">
-                <button className="p-2.5 rounded-xl hover:bg-black/5 dark:hover:bg-white/5 text-surface-500 transition-all active:scale-90">
-                  <Search size={20} />
+            {/* Desktop Navigation Row (Single Line) */}
+            <nav className="hidden lg:flex items-center gap-0.5 overflow-x-auto no-scrollbar scroll-smooth">
+              {navItems.map((item) => (
+                <NavLink
+                  key={item.path}
+                  to={item.path}
+                  className={({ isActive }) => `
+                    flex items-center gap-1.5 px-2.5 py-2 rounded-xl transition-all duration-300 group whitespace-nowrap
+                    ${isActive 
+                      ? 'bg-primary/10 text-primary font-black scale-105' 
+                      : 'text-surface-500 dark:text-surface-400 hover:bg-black/5 dark:hover:bg-white/5 hover:text-surface-900 dark:hover:text-surface-100'}
+                  `}
+                >
+                  <item.icon size={16} className="transition-transform group-hover:scale-110" />
+                  <span className="text-[11px] font-bold uppercase tracking-wide">{item.label}</span>
+                </NavLink>
+              ))}
+            </nav>
+
+            {/* Right Side Actions */}
+            <div className="flex items-center gap-1.5 md:gap-3 shrink-0">
+              <div className="hidden lg:flex items-center gap-1.5">
+                <button className="p-2 rounded-xl hover:bg-black/5 dark:hover:bg-white/5 text-surface-400 transition-all active:scale-90">
+                  <Search size={18} />
                 </button>
                 
-                <button className="p-2.5 rounded-xl bg-white dark:bg-white/5 border border-black/5 dark:border-white/5 shadow-sm hover:shadow-md transition-all relative active:scale-90 group">
-                  <Bell size={20} className="text-surface-500 group-hover:text-primary transition-colors" />
-                  <span className="absolute top-2.5 right-2.5 w-2 h-2 bg-primary rounded-full border-2 border-white dark:border-slate-800"></span>
+                <button className="p-2 rounded-xl bg-white dark:bg-white/5 border border-black/5 dark:border-white/5 shadow-sm hover:shadow-md transition-all relative active:scale-90 group">
+                  <Bell size={18} className="text-surface-400 group-hover:text-primary transition-colors" />
+                  <span className="absolute top-2 right-2 w-1.5 h-1.5 bg-primary rounded-full border border-white dark:border-slate-800"></span>
                 </button>
 
-                <div className="h-8 w-px bg-black/5 dark:bg-white/5 mx-1"></div>
+                <div className="h-6 w-px bg-black/5 dark:bg-white/5 mx-1"></div>
 
-                <div className="h-10 w-10 rounded-2xl bg-gradient-premium flex items-center justify-center text-white font-black text-lg overflow-hidden shadow-lg shadow-emerald-500/20 border-2 border-white dark:border-white/10 active:scale-95 transition-transform">
+                <div className="h-8 w-8 rounded-xl bg-gradient-premium flex items-center justify-center text-white font-black text-sm overflow-hidden shadow-lg shadow-emerald-500/20 border border-white dark:border-white/10 active:scale-95 transition-transform">
                   {user?.user_metadata?.avatar_url ? (
                     <img src={user.user_metadata.avatar_url} alt="Profile" className="w-full h-full object-cover" />
                   ) : (
@@ -97,42 +116,30 @@ export const Layout = () => {
 
                 <button 
                   onClick={handleLogout}
-                  className="flex items-center gap-2 px-4 py-2 hover:bg-red-500/10 text-surface-500 hover:text-red-500 rounded-xl transition-all active:scale-90 border border-transparent hover:border-red-500/10 font-bold text-sm"
+                  className="flex items-center gap-1.5 px-3 py-1.5 hover:bg-red-500/10 text-surface-400 hover:text-red-500 rounded-lg transition-all active:scale-90 border border-transparent font-bold text-[11px] uppercase"
                 >
-                  <LogOut size={18} />
-                  <span>Logout</span>
+                  <LogOut size={16} />
+                  <span className="hidden xl:inline">Logout</span>
                 </button>
               </div>
 
-              {/* Mobile Menu Toggle */}
-              <button 
-                onClick={toggleMenu}
-                className="lg:hidden p-2.5 bg-primary text-white rounded-xl active:scale-90 transition-all shadow-lg shadow-emerald-500/30"
-              >
-                {isMenuOpen ? <X size={22} /> : <Menu size={22} />}
-              </button>
-            </div>
-          </div>
-
-          {/* Desktop Navigation Row (Hidden on Mobile) */}
-          <div className="hidden lg:block max-w-7xl mx-auto w-full px-8 pb-2">
-            <nav className="flex items-center gap-1 py-1 overflow-x-auto no-scrollbar">
-              {navItems.map((item) => (
-                <NavLink
-                  key={item.path}
-                  to={item.path}
-                  className={({ isActive }) => `
-                    flex items-center gap-2 px-4 py-3 rounded-xl transition-all duration-300 group whitespace-nowrap
-                    ${isActive 
-                      ? 'bg-primary/10 text-primary font-bold border-b-2 border-primary' 
-                      : 'text-surface-500 dark:text-surface-400 hover:bg-black/5 dark:hover:bg-white/5 hover:text-surface-900 dark:hover:text-surface-100 border-b-2 border-transparent'}
-                  `}
+              {/* Mobile Profile & Menu Toggle */}
+              <div className="lg:hidden flex items-center gap-2">
+                 <div className="h-9 w-9 rounded-xl bg-gradient-premium flex items-center justify-center text-white font-black text-sm overflow-hidden shadow-lg border border-white dark:border-white/10">
+                    {user?.user_metadata?.avatar_url ? (
+                      <img src={user.user_metadata.avatar_url} alt="Profile" className="w-full h-full object-cover" />
+                    ) : (
+                      user?.user_metadata?.full_name?.charAt(0) || 'U'
+                    )}
+                  </div>
+                <button 
+                  onClick={toggleMenu}
+                  className="p-2 bg-primary text-white rounded-xl active:scale-90 transition-all shadow-lg shadow-emerald-500/30"
                 >
-                  <item.icon size={18} className="transition-transform group-hover:scale-110" />
-                  <span className="text-sm font-bold tracking-tight">{item.label}</span>
-                </NavLink>
-              ))}
-            </nav>
+                  {isMenuOpen ? <X size={20} /> : <Menu size={20} />}
+                </button>
+              </div>
+            </div>
           </div>
 
           {/* Mobile Quick Nav (Horizontal Scroll) - Controlled visibility */}
