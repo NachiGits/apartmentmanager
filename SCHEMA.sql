@@ -34,16 +34,24 @@ CREATE TABLE IF NOT EXISTS profiles (
   sqft_build_up numeric DEFAULT 0,
   sqft_carpet numeric DEFAULT 0,
   sqft_uds numeric DEFAULT 0,
+  sqft_pending_build_up numeric,
+  sqft_pending_carpet numeric,
+  sqft_pending_uds numeric,
+  sqft_status text DEFAULT 'APPROVED' CHECK (sqft_status IN ('PENDING', 'APPROVED')),
   updated_at timestamp with time zone DEFAULT timezone('utc'::text, now())
 );
 
--- Ensure missing columns exist in profiles
+-- Ensure essential profile metadata columns
 ALTER TABLE profiles ADD COLUMN IF NOT EXISTS email text;
 ALTER TABLE profiles ADD COLUMN IF NOT EXISTS unit_number text;
 ALTER TABLE profiles ADD COLUMN IF NOT EXISTS occupancy_type text DEFAULT 'OWNER' CHECK (occupancy_type IN ('OWNER', 'TENANT'));
 ALTER TABLE profiles ADD COLUMN IF NOT EXISTS sqft_build_up numeric DEFAULT 0;
 ALTER TABLE profiles ADD COLUMN IF NOT EXISTS sqft_carpet numeric DEFAULT 0;
 ALTER TABLE profiles ADD COLUMN IF NOT EXISTS sqft_uds numeric DEFAULT 0;
+ALTER TABLE profiles ADD COLUMN IF NOT EXISTS sqft_pending_build_up numeric;
+ALTER TABLE profiles ADD COLUMN IF NOT EXISTS sqft_pending_carpet numeric;
+ALTER TABLE profiles ADD COLUMN IF NOT EXISTS sqft_pending_uds numeric;
+ALTER TABLE profiles ADD COLUMN IF NOT EXISTS sqft_status text DEFAULT 'APPROVED' CHECK (sqft_status IN ('PENDING', 'APPROVED'));
 
 -- Update role constraint safely
 ALTER TABLE profiles DROP CONSTRAINT IF EXISTS profiles_role_check;
@@ -142,7 +150,18 @@ ALTER TABLE announcements ENABLE ROW LEVEL SECURITY;
 ALTER TABLE complaints ENABLE ROW LEVEL SECURITY;
 ALTER TABLE invitations ENABLE ROW LEVEL SECURITY;
 
--- 3. HELPER FUNCTIONS (SECURITY DEFINER)
+-- 3. HELPER FUNCTIONS
+CREATE OR REPLACE FUNCTION is_super_admin()
+RETURNS boolean AS $$
+BEGIN
+  RETURN EXISTS (
+    SELECT 1 FROM profiles 
+    WHERE id = auth.uid() 
+    AND role = 'SUPER_ADMIN'
+  );
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
 CREATE OR REPLACE FUNCTION get_my_apartments()
 RETURNS TABLE (apt_id uuid) 
 LANGUAGE plpgsql SECURITY DEFINER
@@ -181,93 +200,63 @@ BEGIN
 END;
 $$;
 
-CREATE OR REPLACE FUNCTION is_super_admin()
-RETURNS boolean 
-LANGUAGE plpgsql SECURITY DEFINER
-AS $$
-BEGIN
-  RETURN EXISTS (
-    SELECT 1 FROM public.profiles 
-    WHERE id = auth.uid() 
-    AND role = 'SUPER_ADMIN'
-  );
-END;
-$$;
-
--- 4. POLICIES (DROP and RECREATE)
-
--- Apartment Members
-DROP POLICY IF EXISTS "Members can view their own membership" ON apartment_members;
-CREATE POLICY "Members can view their own membership" ON apartment_members FOR SELECT USING (profile_id = auth.uid() OR is_super_admin());
-
-DROP POLICY IF EXISTS "Apartment members can view other members" ON apartment_members;
-CREATE POLICY "Apartment members can view other members" ON apartment_members FOR SELECT USING (apartment_id IN (SELECT get_my_apartments()) OR is_super_admin());
-
-DROP POLICY IF EXISTS "Users can manage their own memberships" ON apartment_members;
-CREATE POLICY "Users can manage their own memberships" ON apartment_members FOR ALL USING (profile_id = auth.uid() OR is_super_admin()) WITH CHECK (profile_id = auth.uid() OR is_super_admin());
-
-DROP POLICY IF EXISTS "Admins can update member roles" ON apartment_members;
-CREATE POLICY "Admins can update member roles" ON apartment_members FOR ALL USING (is_super_admin() OR is_admin_of(apartment_id));
+-- 4. POLICIES (Consolidated with SUPER_ADMIN overrides)
 
 -- Apartments
-DROP POLICY IF EXISTS "Apartment public access" ON apartments;
-CREATE POLICY "Apartment public access" ON apartments FOR SELECT USING (true);
+DROP POLICY IF EXISTS "Apartment access" ON apartments;
+CREATE POLICY "Apartment access" ON apartments FOR SELECT
+  USING (is_super_admin() OR id IN (SELECT get_my_apartments()) OR created_by = auth.uid() OR true);
 
-DROP POLICY IF EXISTS "Authenticated users can create apartments" ON apartments;
-CREATE POLICY "Authenticated users can create apartments" ON apartments FOR INSERT WITH CHECK (auth.uid() IS NOT NULL);
-
-DROP POLICY IF EXISTS "Admins can update their apartment" ON apartments;
-CREATE POLICY "Admins can update their apartment" ON apartments FOR UPDATE USING (is_super_admin() OR created_by = auth.uid());
-
-DROP POLICY IF EXISTS "Super admins can view all apartments" ON apartments;
-CREATE POLICY "Super admins can view all apartments" ON apartments FOR SELECT USING (is_super_admin());
-
-DROP POLICY IF EXISTS "Users can view apartments they belong to" ON apartments;
-CREATE POLICY "Users can view apartments they belong to" ON apartments FOR SELECT USING (id IN (SELECT get_my_apartments()) OR created_by = auth.uid() OR is_super_admin());
+DROP POLICY IF EXISTS "Apartment manage" ON apartments;
+CREATE POLICY "Apartment manage" ON apartments FOR ALL
+  USING (is_super_admin() OR created_by = auth.uid());
 
 -- Profiles
-DROP POLICY IF EXISTS "Profiles are viewable by apartment members" ON profiles;
-CREATE POLICY "Profiles are viewable by apartment members" ON profiles FOR SELECT USING (id = auth.uid() OR is_super_admin() OR can_view_profile(id));
+DROP POLICY IF EXISTS "Profile view" ON profiles;
+CREATE POLICY "Profile view" ON profiles FOR SELECT
+  USING (is_super_admin() OR id = auth.uid() OR can_view_profile(id));
 
-DROP POLICY IF EXISTS "Users can update their own profile" ON profiles;
-CREATE POLICY "Users can update their own profile" ON profiles FOR UPDATE USING (id = auth.uid() OR is_super_admin());
+DROP POLICY IF EXISTS "Profile update" ON profiles;
+CREATE POLICY "Profile update" ON profiles FOR UPDATE
+  USING (is_super_admin() OR id = auth.uid() OR is_admin_of(apartment_id));
 
-DROP POLICY IF EXISTS "Admins can update residents in their apartment" ON profiles;
-CREATE POLICY "Admins can update residents in their apartment" ON profiles FOR UPDATE USING (is_super_admin() OR is_admin_of(apartment_id));
+-- Apartment Members
+DROP POLICY IF EXISTS "Member view" ON apartment_members;
+CREATE POLICY "Member view" ON apartment_members FOR SELECT
+  USING (is_super_admin() OR profile_id = auth.uid() OR apartment_id IN (SELECT get_my_apartments()));
 
-DROP POLICY IF EXISTS "Users can create their own profile" ON profiles;
-CREATE POLICY "Users can create their own profile" ON profiles FOR INSERT WITH CHECK (id = auth.uid());
+DROP POLICY IF EXISTS "Member manage" ON apartment_members;
+CREATE POLICY "Member manage" ON apartment_members FOR ALL
+  USING (is_super_admin() OR is_admin_of(apartment_id));
 
--- Other Tables
-DROP POLICY IF EXISTS "Units are viewable by apartment members" ON resident_units;
-CREATE POLICY "Units are viewable by apartment members" ON resident_units FOR SELECT USING (apartment_id IN (SELECT get_my_apartments()) OR is_super_admin());
+-- Expenses
+DROP POLICY IF EXISTS "Expense view" ON expenses;
+CREATE POLICY "Expense view" ON expenses FOR SELECT
+  USING (is_super_admin() OR apartment_id IN (SELECT get_my_apartments()));
 
-DROP POLICY IF EXISTS "Expenses are viewable by apartment members" ON expenses;
-CREATE POLICY "Expenses are viewable by apartment members" ON expenses FOR SELECT USING (apartment_id IN (SELECT get_my_apartments()) OR is_super_admin());
+DROP POLICY IF EXISTS "Expense manage" ON expenses;
+CREATE POLICY "Expense manage" ON expenses FOR ALL
+  USING (is_super_admin() OR is_admin_of(apartment_id));
 
-DROP POLICY IF EXISTS "Charges are viewable by apartment members" ON charges;
-CREATE POLICY "Charges are viewable by apartment members" ON charges FOR SELECT USING (apartment_id IN (SELECT get_my_apartments()) OR is_super_admin());
+-- Complaints
+DROP POLICY IF EXISTS "Complaint view" ON complaints;
+CREATE POLICY "Complaint view" ON complaints FOR SELECT
+  USING (is_super_admin() OR profile_id = auth.uid() OR apartment_id IN (SELECT get_my_apartments()));
 
-DROP POLICY IF EXISTS "Announcements are viewable by apartment members" ON announcements;
-CREATE POLICY "Announcements are viewable by apartment members" ON announcements FOR SELECT USING (apartment_id IN (SELECT get_my_apartments()) OR is_super_admin());
-
-DROP POLICY IF EXISTS "Complaints are viewable by apartment members" ON complaints;
-CREATE POLICY "Complaints are viewable by apartment members" ON complaints FOR SELECT USING (apartment_id IN (SELECT get_my_apartments()) OR is_super_admin());
-
-DROP POLICY IF EXISTS "Users can create complaints" ON complaints;
-CREATE POLICY "Users can create complaints" ON complaints FOR INSERT WITH CHECK (profile_id = auth.uid());
+DROP POLICY IF EXISTS "Complaint manage" ON complaints;
+CREATE POLICY "Complaint manage" ON complaints FOR ALL
+  USING (is_super_admin() OR profile_id = auth.uid() OR is_admin_of(apartment_id));
 
 -- Invitations
-DROP POLICY IF EXISTS "Invitations are viewable by everyone" ON invitations;
-CREATE POLICY "Invitations are viewable by everyone" ON invitations FOR SELECT USING (true);
+DROP POLICY IF EXISTS "Invitation view" ON invitations;
+CREATE POLICY "Invitation view" ON invitations FOR SELECT USING (true);
 
-DROP POLICY IF EXISTS "Authenticated users can update invitation status" ON invitations;
-CREATE POLICY "Authenticated users can update invitation status" ON invitations FOR UPDATE USING (auth.uid() IS NOT NULL);
+DROP POLICY IF EXISTS "Invitation manage" ON invitations;
+CREATE POLICY "Invitation manage" ON invitations FOR ALL
+  USING (is_super_admin() OR is_admin_of(apartment_id));
 
-DROP POLICY IF EXISTS "Admins can create invitations" ON invitations;
-CREATE POLICY "Admins can create invitations" ON invitations FOR INSERT WITH CHECK (is_admin_of(apartment_id) OR is_super_admin());
 
--- 5. TRIGGERS & FUNCTIONS
+-- 5. TRIGGERS
 CREATE OR REPLACE FUNCTION public.handle_new_user()
 RETURNS trigger AS $$
 BEGIN
@@ -286,21 +275,6 @@ BEGIN
   RETURN new;
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
-
-CREATE OR REPLACE FUNCTION check_apartment_membership_limit()
-RETURNS trigger AS $$
-BEGIN
-  IF (SELECT count(*) FROM apartment_members WHERE profile_id = NEW.profile_id) >= 3 THEN
-    RAISE EXCEPTION 'A user cannot belong to more than 3 apartments.';
-  END IF;
-  RETURN NEW;
-END;
-$$ LANGUAGE plpgsql;
-
-DROP TRIGGER IF EXISTS tr_check_membership_limit ON apartment_members;
-CREATE TRIGGER tr_check_membership_limit
-  BEFORE INSERT ON apartment_members
-  FOR EACH ROW EXECUTE PROCEDURE check_apartment_membership_limit();
 
 DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;
 CREATE TRIGGER on_auth_user_created
