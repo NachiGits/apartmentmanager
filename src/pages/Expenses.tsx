@@ -22,16 +22,49 @@ export const Expenses = () => {
   const [amount, setAmount] = useState('');
   const [desc, setDesc] = useState('');
   const [month, setMonth] = useState(new Date().toISOString().slice(0, 7));
+  const [userRole, setUserRole] = useState<string | null>(null);
+  const [userAptId, setUserAptId] = useState<string | null>(null);
+  const [allApts, setAllApts] = useState<any[]>([]);
 
   useEffect(() => {
-    fetchExpenses();
-  }, [month]);
+    init();
+  }, []);
+
+  useEffect(() => {
+    if (userAptId) {
+      fetchExpenses();
+    }
+  }, [month, userAptId]);
+
+  const init = async () => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
+
+    const { data: profile } = await supabase.from('profiles').select('role, apartment_id').eq('id', user.id).single();
+    const role = profile?.role || 'RESIDENT';
+    setUserRole(role);
+
+    let aptId = profile?.apartment_id;
+
+    if (role === 'SUPER_ADMIN') {
+      const { data: apts } = await supabase.from('apartments').select('*').order('name');
+      setAllApts(apts || []);
+      if (!aptId && apts && apts.length > 0) aptId = apts[0].id;
+    }
+    
+    setUserAptId(aptId || null);
+  };
 
   const fetchExpenses = async () => {
+    if (!userAptId) {
+      setLoading(false);
+      return;
+    }
     setLoading(true);
     const { data } = await supabase
       .from('expenses')
       .select('*')
+      .eq('apartment_id', userAptId)
       .eq('month', month)
       .order('created_at', { ascending: false });
     
@@ -41,11 +74,13 @@ export const Expenses = () => {
 
   const handleAddExpense = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!userAptId) return;
+
     const { error } = await supabase.from('expenses').insert({
       amount: parseFloat(amount),
       description: desc,
       month,
-      apartment_id: (await supabase.auth.getUser()).data.user?.user_metadata.apartment_id // This would need proper profile fetch in real app
+      apartment_id: userAptId
     });
 
     if (!error) {
@@ -72,8 +107,30 @@ export const Expenses = () => {
     <div className="space-y-8 max-w-7xl mx-auto">
       <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
         <div>
-          <h2 className="text-3xl font-bold text-slate-900 dark:text-white">Expense Tracker</h2>
-          <p className="text-slate-500 mt-1">Manage and track community spending.</p>
+          <div className="flex items-center gap-3 mb-1">
+             <h2 className="text-3xl font-black text-slate-900 dark:text-white tracking-tight">Expense Tracker</h2>
+             {userRole === 'SUPER_ADMIN' && (
+                <span className="px-2 py-0.5 bg-amber-500/10 text-amber-500 text-[10px] font-black uppercase tracking-widest rounded-md border border-amber-500/20">
+                  Global Oversight
+                </span>
+             )}
+          </div>
+          <p className="text-slate-500 text-sm font-medium">Manage and track community spending.</p>
+          
+          {userRole === 'SUPER_ADMIN' && allApts.length > 0 && (
+            <div className="mt-4 flex items-center gap-3 bg-white dark:bg-white/5 p-2 rounded-2xl border border-black/5 max-w-sm">
+               <Receipt size={16} className="ml-2 text-primary" />
+               <select 
+                 value={userAptId || ''}
+                 onChange={(e) => setUserAptId(e.target.value)}
+                 className="flex-1 bg-transparent border-none outline-none font-bold text-xs uppercase tracking-wider"
+               >
+                 {allApts.map(a => (
+                   <option key={a.id} value={a.id}>{a.name}</option>
+                 ))}
+               </select>
+            </div>
+          )}
         </div>
         
         <div className="flex gap-3">

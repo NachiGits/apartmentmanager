@@ -62,6 +62,7 @@ export const Residents = () => {
   }>({ type: null, message: '' });
   const [copied, setCopied]                 = useState(false);
   const [syncing, setSyncing]               = useState(false);
+  const [allApts, setAllApts]               = useState<any[]>([]);
 
   useEffect(() => {
     const init = async () => {
@@ -79,33 +80,36 @@ export const Residents = () => {
         .eq('id', authUser.id)
         .single();
       
+      const currentRole = profile?.role || 'MEMBER';
+      setUserRole(currentRole);
+      setUserFullName(profile?.full_name || '');
+
       let aptId = profile?.apartment_id;
 
-      // 2. If profile has no apartment_id, check memberships junction as fallback
-      if (!aptId) {
-        console.log('[Directory] Profile apartment_id null, checking memberships...');
+      // 2. Fallbacks and Global Data
+      if (currentRole === 'SUPER_ADMIN') {
+        const { data: apts } = await supabase.from('apartments').select('*').order('name');
+        setAllApts(apts || []);
+        
+        // If they already have an apartment picked, or we pick the first one for them
+        if (!aptId && apts && apts.length > 0) {
+           aptId = apts[0].id;
+        }
+      } else if (!aptId) {
         const { data: mems } = await supabase
           .from('apartment_members')
-          .select('apartment_id, role')
+          .select('apartment_id')
           .eq('profile_id', authUser.id)
           .limit(1);
         
         if (mems && mems.length > 0) {
           aptId = mems[0].apartment_id;
-          console.log('[Directory] Found apartment via memberships:', aptId);
         }
       }
       
-      if (profile || aptId) {
-        setUserRole(profile?.role || 'MEMBER');
-        setUserAptId(aptId);
-        setUserFullName(profile?.full_name || '');
-        // Trigger fetch once we have the apt ID
-        if (aptId) {
-          fetchResidents(aptId);
-        } else {
-          setLoading(false);
-        }
+      setUserAptId(aptId || null);
+      if (aptId) {
+        fetchResidents(aptId);
       } else {
         setLoading(false);
       }
@@ -386,12 +390,38 @@ export const Residents = () => {
   return (
     <div className="space-y-8 max-w-7xl mx-auto">
       <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
-        <div>
-          <h2 className="text-3xl font-bold text-slate-900 dark:text-white">Resident Directory</h2>
-          <p className="text-slate-500 mt-1">Manage unit assignments and member access.</p>
+        <div className="flex-1">
+          <div className="flex items-center gap-3 mb-1">
+             <h2 className="text-3xl font-black text-slate-900 dark:text-white tracking-tight">Resident Directory</h2>
+             {userRole === 'SUPER_ADMIN' && (
+                <span className="px-2 py-0.5 bg-amber-500/10 text-amber-500 text-[10px] font-black uppercase tracking-widest rounded-md border border-amber-500/20">
+                  Global Oversight
+                </span>
+             )}
+          </div>
+          <p className="text-slate-500 text-sm font-medium">Manage unit assignments and member access.</p>
+          
+          {userRole === 'SUPER_ADMIN' && allApts.length > 0 && (
+            <div className="mt-4 flex items-center gap-3 bg-white dark:bg-white/5 p-2 rounded-2xl border border-black/5 max-w-sm">
+               <Building2 size={16} className="ml-2 text-primary" />
+               <select 
+                 value={userAptId || ''}
+                 onChange={(e) => {
+                   const id = e.target.value;
+                   setUserAptId(id);
+                   fetchResidents(id);
+                 }}
+                 className="flex-1 bg-transparent border-none outline-none font-bold text-xs uppercase tracking-wider"
+               >
+                 {allApts.map(a => (
+                   <option key={a.id} value={a.id}>{a.name}</option>
+                 ))}
+               </select>
+            </div>
+          )}
         </div>
 
-        {(userRole === 'ADMIN' || userRole === 'SUPER_ADMIN') && (
+        {(userRole === 'ADMIN' || userRole === 'SUPER_ADMIN') && userAptId && (
           <div className="flex gap-3">
             <button
               onClick={() => { setSyncing(true); fetchResidents(userAptId || undefined).finally(() => setSyncing(false)); }}

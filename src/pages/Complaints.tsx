@@ -19,16 +19,49 @@ export const Complaints = () => {
   const [title, setTitle] = useState('');
   const [desc, setDesc] = useState('');
   const [priority, setPriority] = useState('MEDIUM');
+  const [userRole, setUserRole] = useState<string | null>(null);
+  const [userAptId, setUserAptId] = useState<string | null>(null);
+  const [allApts, setAllApts] = useState<any[]>([]);
 
   useEffect(() => {
-    fetchComplaints();
+    init();
   }, []);
 
+  useEffect(() => {
+    if (userAptId) {
+      fetchComplaints();
+    }
+  }, [userAptId]);
+
+  const init = async () => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
+
+    const { data: profile } = await supabase.from('profiles').select('role, apartment_id').eq('id', user.id).single();
+    const role = profile?.role || 'RESIDENT';
+    setUserRole(role);
+
+    let aptId = profile?.apartment_id;
+
+    if (role === 'SUPER_ADMIN') {
+      const { data: apts } = await supabase.from('apartments').select('*').order('name');
+      setAllApts(apts || []);
+      if (!aptId && apts && apts.length > 0) aptId = apts[0].id;
+    }
+    
+    setUserAptId(aptId || null);
+  };
+
   const fetchComplaints = async () => {
+    if (!userAptId) {
+      setLoading(false);
+      return;
+    }
     setLoading(true);
     const { data } = await supabase
       .from('complaints')
       .select('*, profiles(full_name)')
+      .eq('apartment_id', userAptId)
       .order('created_at', { ascending: false });
     
     setComplaints(data || []);
@@ -37,7 +70,9 @@ export const Complaints = () => {
 
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
-    const user = (await supabase.auth.getUser()).data.user;
+    if (!userAptId) return;
+
+    const { data: { user } } = await supabase.auth.getUser();
     if (!user) return;
 
     const { error } = await supabase.from('complaints').insert({
@@ -45,7 +80,7 @@ export const Complaints = () => {
       description: desc,
       priority,
       profile_id: user.id,
-      apartment_id: user.user_metadata.apartment_id
+      apartment_id: userAptId
     });
 
     if (!error) {
@@ -76,8 +111,30 @@ export const Complaints = () => {
     <div className="space-y-8 max-w-7xl mx-auto">
       <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
         <div>
-          <h2 className="text-3xl font-bold text-slate-900 dark:text-white text-balance">Maintenance & Helpdesk</h2>
-          <p className="text-slate-500 mt-1">Report issues or track existing maintenance requests.</p>
+          <div className="flex items-center gap-3 mb-1">
+             <h2 className="text-3xl font-black text-slate-900 dark:text-white tracking-tight">Maintenance & Helpdesk</h2>
+             {userRole === 'SUPER_ADMIN' && (
+                <span className="px-2 py-0.5 bg-amber-500/10 text-amber-500 text-[10px] font-black uppercase tracking-widest rounded-md border border-amber-500/20">
+                  Global Oversight
+                </span>
+             )}
+          </div>
+          <p className="text-slate-500 text-sm font-medium">Report issues or track existing maintenance requests.</p>
+          
+          {userRole === 'SUPER_ADMIN' && allApts.length > 0 && (
+            <div className="mt-4 flex items-center gap-3 bg-white dark:bg-white/5 p-2 rounded-2xl border border-black/5 max-w-sm">
+               <MessageSquareWarning size={16} className="ml-2 text-primary" />
+               <select 
+                 value={userAptId || ''}
+                 onChange={(e) => setUserAptId(e.target.value)}
+                 className="flex-1 bg-transparent border-none outline-none font-bold text-xs uppercase tracking-wider"
+               >
+                 {allApts.map(a => (
+                   <option key={a.id} value={a.id}>{a.name}</option>
+                 ))}
+               </select>
+            </div>
+          )}
         </div>
         
         <button 
