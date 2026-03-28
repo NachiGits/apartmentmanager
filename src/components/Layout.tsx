@@ -49,8 +49,8 @@ export const Layout = () => {
       {/* Top Premium Navigation */}
       <header className="sticky top-0 z-50 w-full">
         {/* Main Header */}
-        <div className="glass mx-0 md:mx-4 mt-0 md:mt-4 border-b md:border border-white/20 dark:border-white/5 bg-white/70 dark:bg-slate-900/70 backdrop-blur-2xl shadow-xl flex flex-col transition-all duration-300">
-          <div className="px-4 md:px-8 py-3 md:py-4 flex items-center justify-between">
+        <div className="glass mx-0 md:mx-4 mt-0 md:mt-4 border-b md:border border-white/20 dark:border-white/5 bg-white/70 dark:bg-slate-900/70 backdrop-blur-2xl shadow-xl transition-all duration-300">
+          <div className="max-w-7xl mx-auto w-full px-4 md:px-8 py-3 md:py-4 flex items-center justify-between">
             {/* Logo Section */}
             <div className="flex items-center gap-3">
               <div className="p-2 bg-gradient-premium rounded-xl text-white shadow-lg shadow-emerald-500/20 active:scale-95 transition-transform cursor-pointer" onClick={() => navigate('/')}>
@@ -62,14 +62,14 @@ export const Layout = () => {
               </div>
             </div>
 
-            {/* Desktop Navigation Links */}
-            <nav className="hidden lg:flex items-center gap-1 mx-8">
+            {/* Desktop Navigation Links (Hidden on small screens) */}
+            <nav className="hidden lg:flex items-center gap-1 mx-4">
               {navItems.map((item) => (
                 <NavLink
                   key={item.path}
                   to={item.path}
                   className={({ isActive }) => `
-                    flex items-center gap-2 px-4 py-2 rounded-xl transition-all duration-300 group
+                    flex items-center gap-2 px-3 py-2 rounded-xl transition-all duration-300 group
                     ${isActive 
                       ? 'bg-primary/10 text-primary font-bold' 
                       : 'text-surface-500 dark:text-surface-400 hover:bg-black/5 dark:hover:bg-white/5 hover:text-surface-900 dark:hover:text-surface-100'}
@@ -94,9 +94,9 @@ export const Layout = () => {
 
               <div className="h-8 w-px bg-black/5 dark:bg-white/5 mx-1 hidden xs:block"></div>
 
-              <div className="flex items-center gap-3">
+              <div className="flex items-center gap-2">
                 <div className="relative group cursor-pointer">
-                  <div className="h-10 w-10 md:h-11 md:w-11 rounded-2xl bg-gradient-premium flex items-center justify-center text-white font-black text-lg overflow-hidden shadow-lg shadow-emerald-500/20 border-2 border-white dark:border-white/10 active:scale-95 transition-transform">
+                  <div className="h-10 w-10 rounded-2xl bg-gradient-premium flex items-center justify-center text-white font-black text-lg overflow-hidden shadow-lg shadow-emerald-500/20 border-2 border-white dark:border-white/10 active:scale-95 transition-transform">
                     {user?.user_metadata?.avatar_url ? (
                       <img src={user.user_metadata.avatar_url} alt="Profile" className="w-full h-full object-cover" />
                     ) : (
@@ -116,7 +116,7 @@ export const Layout = () => {
                 {/* Sign Out Button (Desktop) */}
                 <button 
                   onClick={handleLogout}
-                  className="hidden lg:flex p-2.5 hover:bg-red-500/10 text-surface-400 hover:text-red-500 rounded-xl transition-all active:scale-90"
+                  className="hidden lg:flex p-2.5 hover:bg-red-500/10 text-surface-400 hover:text-red-500 rounded-xl transition-all active:scale-90 ml-1"
                   title="Sign Out"
                 >
                   <LogOut size={20} />
