@@ -61,7 +61,7 @@ export const Layout = () => {
       <header className="sticky top-0 z-50 w-full">
         {/* Main Header */}
         <div className="glass mx-0 md:mx-4 mt-0 md:mt-4 border-b md:border border-white/20 dark:border-white/5 bg-white/70 dark:bg-slate-900/70 backdrop-blur-2xl shadow-xl transition-all duration-300">
-          <div className="max-w-7xl mx-auto w-full px-4 md:px-8 py-3 md:py-4 flex items-center justify-between">
+          <div className="max-w-7xl mx-auto w-full px-4 md:px-8 pt-3 md:pt-4 flex items-center justify-between">
             {/* Logo Section */}
             <div className="flex items-center gap-3">
               <div className="p-2 bg-gradient-premium rounded-xl text-white shadow-lg shadow-emerald-500/20 active:scale-95 transition-transform cursor-pointer" onClick={() => navigate('/')}>
@@ -73,68 +73,66 @@ export const Layout = () => {
               </div>
             </div>
 
-            {/* Desktop Navigation Links (Hidden on small screens) */}
-            <nav className="hidden lg:flex items-center gap-1 mx-4">
+            {/* Right Side Actions (Desktop) */}
+            <div className="flex items-center gap-2 md:gap-4">
+              <div className="hidden lg:flex items-center gap-2 md:gap-3">
+                <button className="p-2.5 rounded-xl hover:bg-black/5 dark:hover:bg-white/5 text-surface-500 transition-all active:scale-90">
+                  <Search size={20} />
+                </button>
+                
+                <button className="p-2.5 rounded-xl bg-white dark:bg-white/5 border border-black/5 dark:border-white/5 shadow-sm hover:shadow-md transition-all relative active:scale-90 group">
+                  <Bell size={20} className="text-surface-500 group-hover:text-primary transition-colors" />
+                  <span className="absolute top-2.5 right-2.5 w-2 h-2 bg-primary rounded-full border-2 border-white dark:border-slate-800"></span>
+                </button>
+
+                <div className="h-8 w-px bg-black/5 dark:bg-white/5 mx-1"></div>
+
+                <div className="h-10 w-10 rounded-2xl bg-gradient-premium flex items-center justify-center text-white font-black text-lg overflow-hidden shadow-lg shadow-emerald-500/20 border-2 border-white dark:border-white/10 active:scale-95 transition-transform">
+                  {user?.user_metadata?.avatar_url ? (
+                    <img src={user.user_metadata.avatar_url} alt="Profile" className="w-full h-full object-cover" />
+                  ) : (
+                    user?.user_metadata?.full_name?.charAt(0) || 'U'
+                  )}
+                </div>
+
+                <button 
+                  onClick={handleLogout}
+                  className="flex items-center gap-2 px-4 py-2 hover:bg-red-500/10 text-surface-500 hover:text-red-500 rounded-xl transition-all active:scale-90 border border-transparent hover:border-red-500/10 font-bold text-sm"
+                >
+                  <LogOut size={18} />
+                  <span>Logout</span>
+                </button>
+              </div>
+
+              {/* Mobile Menu Toggle */}
+              <button 
+                onClick={toggleMenu}
+                className="lg:hidden p-2.5 bg-primary text-white rounded-xl active:scale-90 transition-all shadow-lg shadow-emerald-500/30"
+              >
+                {isMenuOpen ? <X size={22} /> : <Menu size={22} />}
+              </button>
+            </div>
+          </div>
+
+          {/* Desktop Navigation Row (Hidden on Mobile) */}
+          <div className="hidden lg:block max-w-7xl mx-auto w-full px-8 pb-2">
+            <nav className="flex items-center gap-1 py-1 overflow-x-auto no-scrollbar">
               {navItems.map((item) => (
                 <NavLink
                   key={item.path}
                   to={item.path}
                   className={({ isActive }) => `
-                    flex items-center gap-2 px-3 py-2 rounded-xl transition-all duration-300 group
+                    flex items-center gap-2 px-4 py-3 rounded-xl transition-all duration-300 group whitespace-nowrap
                     ${isActive 
-                      ? 'bg-primary/10 text-primary font-bold' 
-                      : 'text-surface-500 dark:text-surface-400 hover:bg-black/5 dark:hover:bg-white/5 hover:text-surface-900 dark:hover:text-surface-100'}
+                      ? 'bg-primary/10 text-primary font-bold border-b-2 border-primary' 
+                      : 'text-surface-500 dark:text-surface-400 hover:bg-black/5 dark:hover:bg-white/5 hover:text-surface-900 dark:hover:text-surface-100 border-b-2 border-transparent'}
                   `}
                 >
                   <item.icon size={18} className="transition-transform group-hover:scale-110" />
-                  <span className="text-sm">{item.label}</span>
+                  <span className="text-sm font-bold tracking-tight">{item.label}</span>
                 </NavLink>
               ))}
             </nav>
-
-            {/* Right Side Actions */}
-            <div className="flex items-center gap-2 md:gap-4">
-              {/* Desktop Actions - Only show on Large Screens */}
-              <button className="hidden lg:flex p-2.5 rounded-xl hover:bg-black/5 dark:hover:bg-white/5 text-surface-500 transition-all active:scale-90">
-                <Search size={20} />
-              </button>
-              
-              <button className="hidden lg:flex p-2.5 rounded-xl bg-white dark:bg-white/5 border border-black/5 dark:border-white/5 shadow-sm hover:shadow-md transition-all relative active:scale-90 group">
-                <Bell size={20} className="text-surface-500 group-hover:text-primary transition-colors" />
-                <span className="absolute top-2.5 right-2.5 w-2 h-2 bg-primary rounded-full border-2 border-white dark:border-slate-800"></span>
-              </button>
-
-              <div className="h-8 w-px bg-black/5 dark:bg-white/5 mx-1 hidden lg:block"></div>
-
-              <div className="flex items-center gap-2">
-                <div className="hidden lg:block relative group cursor-pointer">
-                  <div className="h-10 w-10 rounded-2xl bg-gradient-premium flex items-center justify-center text-white font-black text-lg overflow-hidden shadow-lg shadow-emerald-500/20 border-2 border-white dark:border-white/10 active:scale-95 transition-transform">
-                    {user?.user_metadata?.avatar_url ? (
-                      <img src={user.user_metadata.avatar_url} alt="Profile" className="w-full h-full object-cover" />
-                    ) : (
-                      user?.user_metadata?.full_name?.charAt(0) || 'U'
-                    )}
-                  </div>
-                </div>
-
-                {/* Mobile Menu Toggle - Visible on anything smaller than LG */}
-                <button 
-                  onClick={toggleMenu}
-                  className="lg:hidden p-2.5 bg-primary text-white rounded-xl active:scale-90 transition-all shadow-lg shadow-emerald-500/30"
-                >
-                  {isMenuOpen ? <X size={22} /> : <Menu size={22} />}
-                </button>
-
-                {/* Sign Out Button (Desktop) */}
-                <button 
-                  onClick={handleLogout}
-                  className="hidden lg:flex p-2.5 hover:bg-red-500/10 text-surface-400 hover:text-red-500 rounded-xl transition-all active:scale-90 ml-1"
-                  title="Sign Out"
-                >
-                  <LogOut size={20} />
-                </button>
-              </div>
-            </div>
           </div>
 
           {/* Mobile Quick Nav (Horizontal Scroll) - Controlled visibility */}
