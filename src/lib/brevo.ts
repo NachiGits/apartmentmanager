@@ -179,3 +179,89 @@ export async function sendSqftChangeEmail({
     return { success: false, error: err.message };
   }
 }
+
+/**
+ * Sends expense notification emails to all apartment members.
+ */
+export async function sendExpenseEmail({
+  toEmails,
+  expenseDescription,
+  category,
+  totalAmount,
+  perHeadAmount,
+  month,
+}: {
+  toEmails: string[];
+  expenseDescription: string;
+  category: string;
+  totalAmount: number;
+  perHeadAmount: number;
+  month: string;
+}): Promise<{ success: boolean; error?: string }> {
+  if (!BREVO_API_KEY) return { success: false, error: 'Not configured.' };
+
+  const htmlContent = `
+    <!DOCTYPE html>
+    <html>
+    <head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"></head>
+    <body style="margin:0;padding:0;background:#f8fafc;font-family:Inter,sans-serif;">
+      <div style="max-width:560px;margin:40px auto;background:white;border-radius:24px;overflow:hidden;box-shadow:0 4px 40px rgba(0,0,0,0.08);">
+        <div style="background:linear-gradient(135deg,#dc2626,#e11d48);padding:40px;text-align:center;">
+          <div style="display:inline-block;background:rgba(255,255,255,0.15);border-radius:16px;padding:12px 20px;margin-bottom:16px;">
+            <span style="font-size:28px;">🧾</span>
+          </div>
+          <h1 style="color:white;margin:0;font-size:24px;font-weight:900;">New Community Expense</h1>
+          <p style="color:rgba(255,255,255,0.8);margin:8px 0 0;font-size:14px;">${month}</p>
+        </div>
+        <div style="padding:40px;">
+          <div style="background:#fef2f2;border-radius:12px;padding:20px;margin-bottom:24px;border-left:4px solid #dc2626;">
+            <p style="margin:0 0 4px;color:#991b1b;font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;">Category</p>
+            <p style="margin:0;color:#dc2626;font-size:18px;font-weight:900;">${category}</p>
+          </div>
+          <p style="color:#374151;font-size:16px;margin:0 0 8px;">
+            <strong>${expenseDescription}</strong>
+          </p>
+          <p style="color:#64748b;font-size:14px;margin:0 0 28px;">has been logged as a community expense for ${month}.</p>
+          
+          <div style="display:flex;gap:16px;margin-bottom:28px;">
+            <div style="flex:1;background:#fafafa;border:1px solid #e2e8f0;border-radius:16px;padding:20px;text-align:center;">
+              <p style="margin:0 0 4px;color:#94a3b8;font-size:11px;font-weight:700;text-transform:uppercase;">Total Amount</p>
+              <p style="margin:0;color:#dc2626;font-size:24px;font-weight:900;">₹${totalAmount.toLocaleString()}</p>
+            </div>
+            <div style="flex:1;background:#eef2ff;border:1px solid #c7d2fe;border-radius:16px;padding:20px;text-align:center;">
+              <p style="margin:0 0 4px;color:#6366f1;font-size:11px;font-weight:700;text-transform:uppercase;">Your Share</p>
+              <p style="margin:0;color:#4f46e5;font-size:24px;font-weight:900;">₹${perHeadAmount.toFixed(2)}</p>
+            </div>
+          </div>
+          
+          <p style="color:#94a3b8;font-size:12px;text-align:center;margin:0;">
+            This is an automated notification from HomeConnect. Your maintenance charges will be updated accordingly.
+          </p>
+        </div>
+        <div style="padding:20px 40px;border-top:1px solid #e2e8f0;text-align:center;">
+          <p style="margin:0;color:#cbd5e1;font-size:12px;">© 2024 HomeConnect · Built for modern communities</p>
+        </div>
+      </div>
+    </body>
+    </html>
+  `;
+
+  try {
+    const response = await fetch(BREVO_API_URL, {
+      method: 'POST',
+      headers: {
+        'api-key': BREVO_API_KEY,
+        'content-type': 'application/json',
+      },
+      body: JSON.stringify({
+        sender: { name: SENDER_NAME, email: SENDER_EMAIL },
+        to: toEmails.map(email => ({ email })),
+        subject: `[HomeConnect] New Expense: ${expenseDescription} — ₹${totalAmount.toLocaleString()}`,
+        htmlContent,
+      }),
+    });
+    return { success: response.ok };
+  } catch (err: any) {
+    return { success: false, error: err.message };
+  }
+}

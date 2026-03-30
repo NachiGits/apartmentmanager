@@ -183,7 +183,7 @@ export const Layout = () => {
                                   className="p-4 border-b border-slate-50 dark:border-slate-800/50 hover:bg-indigo-50 dark:hover:bg-indigo-500/10 transition-all cursor-pointer group"
                                 >
                                    <div className="flex gap-3">
-                                      <div className={`h-1.5 w-1.5 rounded-full shrink-0 mt-2 ${n.type === 'SQFT_REQUEST' ? 'bg-amber-500' : 'bg-indigo-500'} group-hover:scale-150 transition-transform`}></div>
+                                      <div className={`h-1.5 w-1.5 rounded-full shrink-0 mt-2 ${n.type === 'SQFT_REQUEST' ? 'bg-amber-500' : n.type === 'ANNOUNCEMENT' ? 'bg-purple-500' : n.type === 'EXPENSE' ? 'bg-rose-500' : 'bg-indigo-500'} group-hover:scale-150 transition-transform`}></div>
                                       <div className="flex-1">
                                          <div className="flex items-center justify-between mb-0.5">
                                             <p className="text-[10px] font-black leading-tight uppercase tracking-widest text-slate-800 dark:text-slate-200">{n.title || 'Notification'}</p>

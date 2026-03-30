@@ -65,6 +65,7 @@ export const Dashboard = () => {
   const [aptMemberCounts, setAptMemberCounts] = useState<{ [key: string]: { admins: number, members: number } }>({});
   const [showDirectory, setShowDirectory] = useState<string | null>(null); // Apartment ID
   const [directoryMembers, setDirectoryMembers] = useState<any[]>([]);
+  const [directoryApt, setDirectoryApt] = useState<any>(null);
   const [dirLoading, setDirLoading] = useState(false);
 
   // User Management State
@@ -224,20 +225,21 @@ export const Dashboard = () => {
   const fetchDirectory = async (aptId: string) => {
     setDirLoading(true);
     try {
-      const { data } = await supabase
+      const { data, error } = await supabase
         .from('apartment_members')
         .select(`
           role,
-          id,
           profile_id,
           profiles:profile_id (
             full_name,
             email,
-            avatar_url
+            avatar_url,
+            unit_number
           )
         `)
         .eq('apartment_id', aptId);
       
+      if (error) console.error('Directory fetch error:', error);
       setDirectoryMembers(data || []);
       setShowDirectory(aptId);
     } catch (err) {
@@ -384,7 +386,7 @@ export const Dashboard = () => {
                <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-8 md:mb-10">
                   <h3 className="text-xl font-black flex items-center gap-4 text-surface-900 dark:text-white">
                     <div className="p-2 bg-indigo-500/10 rounded-xl text-indigo-500"><Building2 size={22} strokeWidth={2.5} /></div>
-                    {(userRole === 'SUPER_ADMIN' || userRole === 'ADMIN') ? 'Portfolio Oversight' : 'Your Residence'}
+                    {(userRole === 'SUPER_ADMIN' || userRole === 'ADMIN') ? 'Apartment Insight' : 'Your Residence'}
                   </h3>
                   
                   <div className="relative group min-w-[300px]">
@@ -633,7 +635,18 @@ export const Dashboard = () => {
             >
               <div className="p-8 border-b border-black/5 flex items-center justify-between bg-surface-50/50 dark:bg-white/5">
                 <div>
-                  <h3 className="text-2xl font-black text-surface-900 dark:text-white">Community Directory</h3>
+                  <h3 className="text-2xl font-black text-surface-900 dark:text-white flex items-center gap-3">
+                    Community Directory
+                    {directoryApt && (
+                      <span className={`text-[9px] font-black px-2 py-0.5 rounded-md uppercase tracking-widest leading-normal ${
+                        directoryApt.calc_type === 'SQFT' 
+                          ? 'bg-amber-100 text-amber-700 dark:bg-amber-500/10 dark:text-amber-400' 
+                          : 'bg-indigo-100 text-indigo-700 dark:bg-indigo-500/10 dark:text-indigo-400'
+                      }`}>
+                        {directoryApt.calc_type === 'SQFT' ? `${directoryApt.calc_basis?.replace('_', ' ') || 'Sqft'} Based` : 'Individual Based'}
+                      </span>
+                    )}
+                  </h3>
                   <p className="text-xs text-surface-500 font-bold uppercase tracking-widest mt-1">Authorized Estate Members</p>
                 </div>
                 <button 
@@ -645,15 +658,43 @@ export const Dashboard = () => {
               </div>
 
               <div className="max-h-[60vh] overflow-y-auto p-4 space-y-2">
-                {directoryMembers.map((member) => (
-                  <div key={member.id} className="p-5 hover:bg-surface-50 dark:hover:bg-white/5 rounded-2xl flex items-center justify-between transition-colors border border-transparent hover:border-black/5">
+                {dirLoading ? (
+                  <div className="py-16 text-center">
+                    <Loader2 className="animate-spin mx-auto text-indigo-500 mb-3" size={32} />
+                    <p className="text-[10px] font-black uppercase tracking-widest text-surface-400">Loading members...</p>
+                  </div>
+                ) : directoryMembers.length === 0 ? (
+                  <div className="py-16 text-center border-2 border-dashed border-black/5 dark:border-white/5 rounded-[2rem]">
+                    <Users size={32} className="mx-auto text-surface-300 mb-3" />
+                    <p className="text-[10px] font-black uppercase tracking-widest text-surface-400">No members found in this community.</p>
+                  </div>
+                ) : directoryMembers.map((member) => (
+                  <div key={member.profile_id} className="p-5 hover:bg-surface-50 dark:hover:bg-white/5 rounded-2xl flex items-center justify-between transition-colors border border-transparent hover:border-black/5">
                     <div className="flex items-center gap-5">
-                      <div className="w-14 h-14 rounded-2xl bg-indigo-500/10 flex items-center justify-center font-black text-indigo-500 text-lg shadow-inner">
-                        {member.profiles?.full_name?.charAt(0) || '?'}
+                      <div className="w-14 h-14 rounded-2xl bg-indigo-500/10 flex items-center justify-center font-black text-indigo-500 text-lg shadow-inner overflow-hidden">
+                        {member.profiles?.avatar_url
+                          ? <img src={member.profiles.avatar_url} alt="" className="w-full h-full object-cover" />
+                          : (member.profiles?.full_name?.charAt(0) || '?')}
                       </div>
                       <div>
                         <p className="font-black text-surface-900 dark:text-white leading-tight">{member.profiles?.full_name || 'Anonymous'}</p>
                         <p className="text-xs text-surface-500 font-medium">{member.profiles?.email}</p>
+                        <div className="flex items-center gap-3 mt-0.5">
+                          {member.profiles?.unit_number && (
+                            <p className="text-[10px] font-bold text-indigo-500 uppercase tracking-wider">Unit {member.profiles.unit_number}</p>
+                          )}
+                          {directoryApt?.calc_type === 'SQFT' && (
+                            <p className="text-[10px] font-bold text-amber-500 uppercase tracking-wider flex items-center gap-1">
+                              {(() => {
+                                const basis = directoryApt.calc_basis || 'BUILD_UP';
+                                const sqft = basis === 'BUILD_UP' ? (member.profiles?.sqft_build_up || 0)
+                                  : basis === 'CARPET' ? (member.profiles?.sqft_carpet || 0)
+                                  : (member.profiles?.sqft_uds || 0);
+                                return sqft > 0 ? `${sqft} sqft` : 'No sqft data';
+                              })()}
+                            </p>
+                          )}
+                        </div>
                       </div>
                     </div>
                     <span className={`px-4 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-widest border ${member.role === 'ADMIN' ? 'bg-indigo-500/10 text-indigo-600 border-indigo-500/20' : 'bg-emerald-500/10 text-emerald-600 border-emerald-500/20'}`}>

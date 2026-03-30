@@ -82,8 +82,18 @@ CREATE TABLE IF NOT EXISTS expenses (
   amount numeric NOT NULL,
   month text NOT NULL, -- Format: YYYY-MM
   description text,
+  category text DEFAULT 'OTHERS',
+  custom_category text,
+  bill_url text,
+  created_by uuid REFERENCES profiles(id) ON DELETE SET NULL,
   created_at timestamp with time zone DEFAULT timezone('utc'::text, now())
 );
+
+-- Add new columns to existing expenses table
+ALTER TABLE expenses ADD COLUMN IF NOT EXISTS category text DEFAULT 'OTHERS';
+ALTER TABLE expenses ADD COLUMN IF NOT EXISTS custom_category text;
+ALTER TABLE expenses ADD COLUMN IF NOT EXISTS bill_url text;
+ALTER TABLE expenses ADD COLUMN IF NOT EXISTS created_by uuid REFERENCES profiles(id) ON DELETE SET NULL;
 
 CREATE TABLE IF NOT EXISTS charges (
   id uuid DEFAULT gen_random_uuid() PRIMARY KEY,
@@ -139,8 +149,20 @@ CREATE TABLE IF NOT EXISTS notifications (
   profile_id uuid REFERENCES profiles(id) ON DELETE CASCADE, -- Recipient
   title text NOT NULL,
   description text,
-  type text CHECK (type IN ('SQFT_REQUEST', 'COMPLAINT', 'GENERAL')),
+  type text CHECK (type IN ('SQFT_REQUEST', 'COMPLAINT', 'GENERAL', 'EXPENSE', 'ANNOUNCEMENT')),
   status text DEFAULT 'UNREAD' CHECK (status IN ('UNREAD', 'READ')),
+  created_at timestamp with time zone DEFAULT timezone('utc'::text, now())
+);
+
+-- Expense splits table: tracks each member's share of an expense
+CREATE TABLE IF NOT EXISTS expense_splits (
+  id uuid DEFAULT gen_random_uuid() PRIMARY KEY,
+  expense_id uuid REFERENCES expenses(id) ON DELETE CASCADE,
+  profile_id uuid REFERENCES profiles(id) ON DELETE CASCADE,
+  apartment_id uuid REFERENCES apartments(id) ON DELETE CASCADE,
+  amount numeric NOT NULL DEFAULT 0,
+  share_percentage numeric DEFAULT 0,
+  status text DEFAULT 'PENDING' CHECK (status IN ('PENDING', 'PAID')),
   created_at timestamp with time zone DEFAULT timezone('utc'::text, now())
 );
 

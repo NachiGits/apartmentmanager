@@ -426,6 +426,29 @@ export const Residents = () => {
       </div>
 
       <div className="glass p-6 bg-white/40 dark:bg-slate-900/40 border-slate-200 dark:border-slate-800">
+        {apartmentConfig && (
+          <div className="mb-6 p-5 bg-gradient-to-r from-indigo-50 to-purple-50 dark:from-indigo-500/10 dark:to-purple-500/10 rounded-2xl border border-indigo-100 dark:border-indigo-500/20 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+            <div className="flex items-center gap-4">
+              <div className="w-12 h-12 rounded-xl bg-white dark:bg-slate-800 shadow-sm flex items-center justify-center text-indigo-500 shrink-0">
+                <Building2 size={24} />
+              </div>
+              <div>
+                <p className="text-[10px] font-black text-indigo-800 dark:text-indigo-400 uppercase tracking-widest mb-1">Community Billing Strategy</p>
+                <p className="text-sm font-medium text-slate-600 dark:text-slate-300">
+                  This community calculates shared expenses based on <strong className="text-indigo-600 dark:text-indigo-300">{apartmentConfig.calc_type === 'SQFT' ? `${apartmentConfig.calc_basis?.replace('_', ' ') || 'SQFT'} Area` : 'Equal Shares Per Unit'}</strong>.
+                </p>
+              </div>
+            </div>
+            <span className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest border shadow-sm ${
+              apartmentConfig.calc_type === 'SQFT' 
+                ? 'bg-amber-100 text-amber-700 border-amber-200 dark:bg-amber-500/20 dark:text-amber-400 dark:border-amber-500/30' 
+                : 'bg-indigo-100 text-indigo-700 border-indigo-200 dark:bg-indigo-500/20 dark:text-indigo-400 dark:border-indigo-500/30'
+            }`}>
+              {apartmentConfig.calc_type === 'SQFT' ? 'SQFT Based' : 'Individual Based'}
+            </span>
+          </div>
+        )}
+
         <div className="flex items-center justify-between mb-8 text-slate-400">
           <div className="relative w-full max-w-md">
             <Search className="absolute left-4 top-1/2 -translate-y-1/2" size={18} />
